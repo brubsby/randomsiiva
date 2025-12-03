@@ -34,7 +34,7 @@ const skewed_distribution = (x, c) => ((1 + c) * x) / (1 + c * x);
 // Configuration Constants
 const Config = {
   browserHasLocalStorage: typeof Storage !== "undefined",
-  
+
   StorageKeys: {
     SHEET_TIMESTAMP: "sheet_timestamp",
     VID_DB: "vid_db",
@@ -42,7 +42,7 @@ const Config = {
     BOOTLEG_VID_DB: "bootleg_vid_db",
     SHOW_TWITTER_TIMESTAMP: "twitter_ignore_timestamp",
     WATCHED_VID_IDS: "watched_vid_ids",
-    RANDOM_VID: "random_vid"
+    RANDOM_VID: "random_vid",
   },
 
   API: {
@@ -56,7 +56,7 @@ const Config = {
       "VvvvvaVvvvvvr!A2:K",
     ],
     CHANNEL_BLOCKLIST: [7792455746889010, 1256373471545759],
-    RIP_BLOCKLIST: []
+    RIP_BLOCKLIST: [],
   },
 
   Filters: {
@@ -70,11 +70,12 @@ const Config = {
       "queen for another day",
       "king for a week",
       "king 4 a day",
-    ]
+    ],
   },
 
   Regex: {
-    ISO8601Duration: /(-)?P(?:([.,\d]+)Y)?(?:([.,\d]+)M)?(?:([.,\d]+)W)?(?:([.,\d]+)D)?T(?:([.,\d]+)H)?(?:([.,\d]+)M)?(?:([.,\d]+)S)?/
+    ISO8601Duration:
+      /(-)?P(?:([.,\d]+)Y)?(?:([.,\d]+)M)?(?:([.,\d]+)W)?(?:([.,\d]+)D)?T(?:([.,\d]+)H)?(?:([.,\d]+)M)?(?:([.,\d]+)S)?/,
   },
 
   Durations: [
@@ -91,7 +92,7 @@ const Config = {
     [">30 SEC", 30],
   ],
 
-  YearFilterStart: 2016
+  YearFilterStart: 2016,
 };
 
 // Computed API Key
@@ -101,7 +102,9 @@ const isLocal =
   window.location.hostname == "127.0.0.1" ||
   window.location.hostname == "0.0.0.0";
 
-Config.API.KEY = isLocal ? Config.API.TESTING_KEY : Config.API.PUBLIC_SHEETS_API_KEY;
+Config.API.KEY = isLocal
+  ? Config.API.TESTING_KEY
+  : Config.API.PUBLIC_SHEETS_API_KEY;
 
 Config.API.SHEETS_QUERY = `https://sheets.googleapis.com/v4/spreadsheets/${Config.API.SHEET_ID}/values:batchGet?key=${Config.API.KEY}&ranges=${Config.API.RANGES.join("&ranges=")}`;
 Config.API.BOOTLEG_SHEET_QUERY = `https://sheets.googleapis.com/v4/spreadsheets/${Config.API.BOOTLEG_SHEET_ID}?key=${Config.API.KEY}`;
