@@ -315,7 +315,7 @@
       </div>
     </div>
     <h3 id="twitter" style="display:none"><a  target="_blank" rel="noopener noreferrer" href="https://twitter.com/brubsby">follow me on twitter</a> or <a  target="_blank" rel="noopener noreferrer" href="https://ko-fi.com/brubsby">buy me a coffee</a> if you like the page! (<a id="hidetwitter">not today</a> / <a id="permahidetwitter">not ever</a>)</h3>
-    <script src="js/lz-string.min.js"></script>
+    <script src="js/db.js"></script>
     <!-- Global site tag (gtag.js) - Google Analytics -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=UA-152720878-1"></script>
     <script>
@@ -357,7 +357,8 @@
 
     var TESTING_KEY = 'AIzaSyAUpx3K3IcUsPAIicY8CSPbtUTjFVw7BSA';
     var PUBLIC_SHEETS_API_KEY = 'AIzaSyAzQyLBAF5kiOZHVLVMLfs_rn1wdCMVnmM';
-    var API_KEY = window.location.href.split(":")[0] == "file" ? TESTING_KEY : PUBLIC_SHEETS_API_KEY;
+    var isLocal = window.location.href.split(":")[0] == "file" || window.location.hostname == "localhost" || window.location.hostname == "127.0.0.1" || window.location.hostname == "0.0.0.0";
+    var API_KEY = isLocal ? TESTING_KEY : PUBLIC_SHEETS_API_KEY;
     var SHEET_ID = '1B7b9jEaWiqZI8Z8CzvFN1cBvLVYwjb5xzhWtrgs4anI';
     var BOOTLEG_SHEET_ID = '1Q_L84zZ2rzS57ZcDcCdmxMsguqjpnbLGr5_QVX5LVKA';
     var RANGES = ['SiIvaGunner!A2:K','TimmyTurnersGrandDad!A2:K','VvvvvaVvvvvvr!A2:K'];
@@ -436,60 +437,53 @@
     var sheets_checked;
     var sheetsjson;
 
-    // optimization for first video loading, ugly but fast
+    // optimization for first video loading
     first_vid_promise = window.localStorage.getItem(LOCALSTORAGE_RANDOM_VID);
     if (!first_vid_promise) { //returning user who doesn't have current vid stored
-      let vid_db_compressed_string = window.localStorage.getItem(LOCALSTORAGE_VID_DB);
-      if (vid_db_compressed_string) {
-        first_vid_promise = new Promise((resolve, reject) => {
-          let fastRandomVidFromLocalStorage = (e) => {
-            vid_db = e.data;
-            if (vid_db) {
-              siiva_vids = vid_db[0];
-              if (browserHasLocalStorage && window.localStorage.getItem(LOCALSTORAGE_WATCHED_VID_IDS)) {
-                  try {
-                    watchedVidIds = JSON.parse(window.localStorage.getItem(LOCALSTORAGE_WATCHED_VID_IDS));
-                  } catch (error) {
-                    watchedVidIds = [];
-                  }
-              } else {
-                watchedVidIds = [];
-              }
-              var differenceWatched = x => !watchedVidIds.includes(x[0]);
-              unwatched_siiva_vids = siiva_vids.filter(differenceWatched);
-              //store a random unwatched vid for quick loading next time
-              window.localStorage.setItem(LOCALSTORAGE_RANDOM_VID,
-                unwatched_siiva_vids[Math.floor(unwatched_siiva_vids.length * Math.random())][0]);
-              resolve(unwatched_siiva_vids[Math.floor(unwatched_siiva_vids.length * Math.random())][0]);
+      first_vid_promise = new Promise(async (resolve, reject) => {
+        try {
+          vid_db = await idbKeyval.get(LOCALSTORAGE_VID_DB);
+          if (vid_db) {
+            siiva_vids = vid_db[0];
+            if (browserHasLocalStorage && window.localStorage.getItem(LOCALSTORAGE_WATCHED_VID_IDS)) {
+                try {
+                  watchedVidIds = JSON.parse(window.localStorage.getItem(LOCALSTORAGE_WATCHED_VID_IDS));
+                } catch (error) {
+                  watchedVidIds = [];
+                }
             } else {
-              resolve("rEcOzjg7vBU");
+              watchedVidIds = [];
             }
-          };
-          if (window.Worker) {
-            let decompressionWorker = new Worker("js/decompressionworker.js");
-            decompressionWorker.onmessage = fastRandomVidFromLocalStorage;
-            decompressionWorker.onerror = (e) => {
-              console.error("Failed to decompress cached rip database")
-              resolve("rEcOzjg7vBU");
-            };
-            decompressionWorker.postMessage(vid_db_compressed_string);
+            var differenceWatched = x => !watchedVidIds.includes(x[0]);
+            unwatched_siiva_vids = siiva_vids.filter(differenceWatched);
+            //store a random unwatched vid for quick loading next time
+            window.localStorage.setItem(LOCALSTORAGE_RANDOM_VID,
+              unwatched_siiva_vids[Math.floor(unwatched_siiva_vids.length * Math.random())][0]);
+            resolve(unwatched_siiva_vids[Math.floor(unwatched_siiva_vids.length * Math.random())][0]);
           } else {
-            fastRandomVidFromLocalStorage(
-              {"data":JSON.parse(LZString.decompressFromUTF16(
-                window.localStorage.getItem(LOCALSTORAGE_VID_DB)))});
+            throw "No cached db";
           }
-        });
-      } else { //first time user
-        first_vid_promise = new Promise((resolve, reject) => {
+        } catch (e) {
+           //first time user or cache miss
           var Httpreq = new XMLHttpRequest();
           Httpreq.open("GET", SHEETS_QUERY, false);
           Httpreq.onload = (e) => {
-            sheetsjson = JSON.parse(Httpreq.responseText);
-            vid_db = processSheetsJSON(sheetsjson);
-            //store a random siiva vid for quick loading next time
-            window.localStorage.setItem(LOCALSTORAGE_RANDOM_VID,
-              vid_db[0][Math.floor(vid_db[0].length * Math.random())][0]);
-            resolve(vid_db[0][Math.floor(vid_db[0].length * Math.random())][0]);
+            if (Httpreq.status !== 200) {
+              console.error("Error fetching siiva rip database: " + Httpreq.status);
+              resolve("rEcOzjg7vBU");
+              return;
+            }
+            try {
+              sheetsjson = JSON.parse(Httpreq.responseText);
+              vid_db = processSheetsJSON(sheetsjson);
+              //store a random siiva vid for quick loading next time
+              window.localStorage.setItem(LOCALSTORAGE_RANDOM_VID,
+                vid_db[0][Math.floor(vid_db[0].length * Math.random())][0]);
+              resolve(vid_db[0][Math.floor(vid_db[0].length * Math.random())][0]);
+            } catch (parseError) {
+               console.error("Error parsing siiva rip database: ", parseError);
+               resolve("rEcOzjg7vBU");
+            }
           };
           Httpreq.onerror = (e) => {
             console.error("Error fetching siiva rip database");
@@ -497,39 +491,67 @@
             resolve("rEcOzjg7vBU");
           };
           Httpreq.send(null);
-        });
-      }
+        }
+      });
     }
 
     function makeGetRequest(url){
       var Httpreq = new XMLHttpRequest(); // a new request
       Httpreq.open("GET", url, false);
       Httpreq.send(null);
+      if (Httpreq.status !== 200) {
+        throw new Error("HTTP error " + Httpreq.status);
+      }
       return Httpreq.responseText;
     }
 
     function makeJSONRequest(url) {
-      return JSON.parse(makeGetRequest(url));
+      try {
+        return JSON.parse(makeGetRequest(url));
+      } catch (e) {
+        console.error("Request failed for " + url + ": " + e);
+        return null;
+      }
     }
 
     async function checkSheets() {
-      if (!browserHasLocalStorage || window.localStorage.getItem(LOCALSTORAGE_VID_DB) === null || !(window.localStorage.getItem(LOCALSTORAGE_SHEET_TIMESTAMP) && parseInt(window.localStorage.getItem(LOCALSTORAGE_SHEET_TIMESTAMP)) > Date.now())) {
+      // Check timestamp in localStorage (timestamps are small, fine to keep in sync storage)
+      // But the data itself is in IDB
+      let storedTimestamp = window.localStorage.getItem(LOCALSTORAGE_SHEET_TIMESTAMP);
+      let dbHasData = false;
+      try {
+        let data = await idbKeyval.get(LOCALSTORAGE_VID_DB);
+        if (data) dbHasData = true;
+      } catch (e) {}
+
+      if (!browserHasLocalStorage || !dbHasData || !(storedTimestamp && parseInt(storedTimestamp) > Date.now())) {
         if (!sheetsjson) {
           sheetsjson = makeJSONRequest(SHEETS_QUERY);
-          vid_db = processSheetsJSON(sheetsjson);
+          if (sheetsjson) {
+            vid_db = processSheetsJSON(sheetsjson);
+          } else {
+             // fallback if request fails? or just don't update
+             if (dbHasData) {
+                vid_db = await idbKeyval.get(LOCALSTORAGE_VID_DB); // use stale data if available
+             } else {
+                // Critical failure, maybe empty list or some default
+                console.error("Could not load sheet data and no cache available.");
+                return; 
+             }
+          }
         }
-        if (browserHasLocalStorage) {
-          window.localStorage.setItem(LOCALSTORAGE_VID_DB, LZString.compressToUTF16(JSON.stringify(vid_db)));
+        if (browserHasLocalStorage && sheetsjson) {
+          await idbKeyval.set(LOCALSTORAGE_VID_DB, vid_db);
           window.localStorage.setItem(LOCALSTORAGE_SHEET_TIMESTAMP, Date.now() + 86400000); // one day
         }
       } else {
         try {
-          vid_db = JSON.parse(LZString.decompressFromUTF16(window.localStorage.getItem(LOCALSTORAGE_VID_DB)));
+          vid_db = await idbKeyval.get(LOCALSTORAGE_VID_DB);
           if (!vid_db) {
-            throw 'empty db from localstorage';
+            throw 'empty db from indexeddb';
           }
         } catch (e) {
-          window.localStorage.removeItem(LOCALSTORAGE_VID_DB);
+          await idbKeyval.delete(LOCALSTORAGE_VID_DB);
           window.localStorage.removeItem(LOCALSTORAGE_SHEET_TIMESTAMP);
           checkSheets();
           return;
@@ -548,32 +570,56 @@
       }
     }
 
-    function checkBootlegSheets() {
-      if (!browserHasLocalStorage || window.localStorage.getItem(LOCALSTORAGE_BOOTLEG_VID_DB) === null || !(window.localStorage.getItem(LOCALSTORAGE_BOOTLEG_SHEET_TIMESTAMP) && parseInt(window.localStorage.getItem(LOCALSTORAGE_BOOTLEG_SHEET_TIMESTAMP)) > Date.now())) {
+    async function checkBootlegSheets() {
+      let storedTimestamp = window.localStorage.getItem(LOCALSTORAGE_BOOTLEG_SHEET_TIMESTAMP);
+      let dbHasData = false;
+      try {
+        let data = await idbKeyval.get(LOCALSTORAGE_BOOTLEG_VID_DB);
+        if (data) dbHasData = true;
+      } catch (e) {}
+
+      if (!browserHasLocalStorage || !dbHasData || !(storedTimestamp && parseInt(storedTimestamp) > Date.now())) {
         var bootlegSheetNameJSON = makeJSONRequest(BOOTLEG_SHEET_QUERY);
-        var bootlegSheetNames = bootlegSheetNameJSON['sheets'].map(sheet => sheet.properties['title']).filter(title => !['Summary', 'Template'].includes(title) && !CHANNEL_BLOCKLIST.includes(cyrb53(title)));
-        // too many bootleg channels, gotta bach the queries
-        var bootlegSheetNameBatches = chunk(bootlegSheetNames, 100);
-        var bootlegSheetsJSONs = bootlegSheetNameBatches.map(names => makeJSONRequest(BOOTLEG_SHEETS_BATCH_QUERY + names.map(name => '&ranges=' + encodeURIComponent(name) + '!A2:K').join('')));
-        // merge the multiple queries into one JSON
-        var bootlegSheetsJSON = bootlegSheetsJSONs.reduce((retval, bootlegJSON) => {
-          retval['spreadsheetId'] = bootlegJSON['spreadsheetId'];
-          retval['valueRanges'] = (retval['valueRanges'] ? retval['valueRanges'] : []).concat(bootlegJSON['valueRanges']);
-          return retval;
-        }, {})
-        bootleg_vid_db = processBootlegSheetsJSON(bootlegSheetsJSON);
-        if (browserHasLocalStorage) {
-          window.localStorage.setItem(LOCALSTORAGE_BOOTLEG_VID_DB, LZString.compressToUTF16(JSON.stringify(bootleg_vid_db)));
-          window.localStorage.setItem(LOCALSTORAGE_BOOTLEG_SHEET_TIMESTAMP, Date.now() + 172800000); // two days
+        if (bootlegSheetNameJSON && bootlegSheetNameJSON['sheets']) {
+            var bootlegSheetNames = bootlegSheetNameJSON['sheets'].map(sheet => sheet.properties['title']).filter(title => !['Summary', 'Template'].includes(title) && !CHANNEL_BLOCKLIST.includes(cyrb53(title)));
+            // too many bootleg channels, gotta bach the queries
+            var bootlegSheetNameBatches = chunk(bootlegSheetNames, 100);
+            var bootlegSheetsJSONs = bootlegSheetNameBatches.map(names => makeJSONRequest(BOOTLEG_SHEETS_BATCH_QUERY + names.map(name => '&ranges=' + encodeURIComponent(name) + '!A2:K').join('')));
+            // merge the multiple queries into one JSON
+            var bootlegSheetsJSON = bootlegSheetsJSONs.reduce((retval, bootlegJSON) => {
+              if (!bootlegJSON) return retval;
+              retval['spreadsheetId'] = bootlegJSON['spreadsheetId'];
+              retval['valueRanges'] = (retval['valueRanges'] ? retval['valueRanges'] : []).concat(bootlegJSON['valueRanges']);
+              return retval;
+            }, {})
+            if (bootlegSheetsJSON.valueRanges) {
+              bootleg_vid_db = processBootlegSheetsJSON(bootlegSheetsJSON);
+              if (browserHasLocalStorage) {
+                await idbKeyval.set(LOCALSTORAGE_BOOTLEG_VID_DB, bootleg_vid_db);
+                window.localStorage.setItem(LOCALSTORAGE_BOOTLEG_SHEET_TIMESTAMP, Date.now() + 172800000); // two days
+              }
+            } else {
+               if (dbHasData) {
+                  bootleg_vid_db = await idbKeyval.get(LOCALSTORAGE_BOOTLEG_VID_DB);
+               } else {
+                  bootleg_vid_db = [];
+               }
+            }
+        } else {
+            if (dbHasData) {
+               bootleg_vid_db = await idbKeyval.get(LOCALSTORAGE_BOOTLEG_VID_DB);
+            } else {
+               bootleg_vid_db = [];
+            }
         }
       } else {
         try {
-          bootleg_vid_db = JSON.parse(LZString.decompressFromUTF16(window.localStorage.getItem(LOCALSTORAGE_BOOTLEG_VID_DB)));
+          bootleg_vid_db = await idbKeyval.get(LOCALSTORAGE_BOOTLEG_VID_DB);
           if (!bootleg_vid_db) {
-            throw 'empty bootleg db from localstorage';
+            throw 'empty bootleg db from indexeddb';
           }
         } catch (e) {
-          window.localStorage.removeItem(LOCALSTORAGE_BOOTLEG_VID_DB);
+          await idbKeyval.delete(LOCALSTORAGE_BOOTLEG_VID_DB);
           window.localStorage.removeItem(LOCALSTORAGE_BOOTLEG_SHEET_TIMESTAMP);
           checkBootlegSheets();
           return;
@@ -1151,8 +1197,7 @@
       onTitleReady();
       //player.playVideo();
       if (!sheets_checked) {
-        checkSheets();
-        checkBootlegSheets();
+        await Promise.all([checkSheets(), checkBootlegSheets()]);
         initWatchedVids();
         window.localStorage.setItem(LOCALSTORAGE_RANDOM_VID, getRandomUnwatchedSiivaVid());
         sheets_checked = true;
