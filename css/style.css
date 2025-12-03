@@ -1,0 +1,209 @@
+@font-face {
+  font-family: "DF";
+  src:
+    url("../assets/LessPerfectDOSVGA.woff") format("woff"),
+    /* Chrome 6+, Firefox 3.6+, IE 9+, Safari 5.1+ */
+      url("../assets/LessPerfectDOSVGA.ttf") format("truetype"); /* Chrome 4+, Firefox 3.5, Opera 10+, Safari 3—5 */
+}
+
+@media (prefers-color-scheme: no-preference),
+  (prefers-color-scheme: dark) {
+  body {
+    background: black;
+    color: white;
+  }
+}
+@media (prefers-color-scheme: light) {
+  body {
+    background: white;
+    color: black;
+  }
+}
+
+@media (orientation: landscape) {
+  div.playercontainer {
+    grid-area: 1 / 2 / span 2 / span 1;
+  }
+  div.menu {
+    grid-area: 1 / 1 / span 2 / span 1;
+  }
+}
+
+@media (orientation: portrait) {
+  div.playercontainer {
+    grid-area: 2 / 1 / span 1 / span 2;
+  }
+  div.menu {
+    grid-area: 1 / 1 / span 1 / span 2;
+  }
+}
+
+@media (pointer: none), (pointer: coarse) {
+  /* remove autowiki popup on mobile*/
+  li#autowiki {
+    display: none;
+  }
+}
+
+html {
+  display: flex;
+  min-height: 100%;
+  position: relative;
+}
+
+body {
+  font-size: 1.25em;
+  font-family: Courier, monospace;
+  margin: auto;
+}
+
+div.container {
+  display: grid;
+  justify-content: center;
+  align-content: center;
+  grid-column-gap: 68px;
+  grid-row-gap: 10px;
+  grid-template-columns: min-content auto;
+  grid-template-rows: min-content auto;
+  height: 100%;
+  margin: 1em;
+}
+div.embedcontainer {
+  width: min(100vw - 2em, 640px);
+  height: 390px;
+}
+div {
+  font-weight: normal;
+}
+ol,
+li {
+  list-style-type: none;
+  padding-left: 8px;
+  white-space: nowrap;
+}
+li {
+  line-height: 1.25em;
+}
+a {
+  -webkit-touch-callout: none; /* iOS Safari */
+  -webkit-user-select: none; /* Safari */
+  -khtml-user-select: none; /* Konqueror HTML */
+  -moz-user-select: none; /* Firefox */
+  -ms-user-select: none; /* Internet Explorer/Edge */
+  user-select: none; /* Non-prefixed version, currently
+                            supported by Chrome and Opera */
+}
+div.menu {
+  margin: 0;
+  justify-self: center;
+}
+h1 {
+  margin: 0;
+  font-weight: normal;
+  white-space: nowrap;
+  style: none;
+  font-size: 1.5em;
+}
+h2 {
+  margin: 0;
+  font-weight: normal;
+  style: none;
+  font-size: 1em;
+  font-family: "DF", monospace;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+}
+h3 {
+  margin: 0;
+  font-weight: normal;
+  style: none;
+  font-size: 0.85em;
+  font-family: "DF", monospace;
+}
+h3 > a {
+  text-decoration: underline;
+}
+h3 > a:hover {
+  font-style: oblique;
+}
+h3#tooltip {
+  visibility: visible;
+  position: relative;
+  padding: 0.25em;
+  word-break: break-all;
+  overflow-wrap: break-word;
+  white-space: pre-wrap;
+  z-index: 1;
+}
+div#tooltipcontainer {
+  visibility: hidden;
+  position: absolute;
+  top: 0;
+  left: 0;
+  background-color: inherit;
+}
+div#tooltipbg {
+  visibility: visible;
+  position: absolute;
+  top: 0;
+  left: 0;
+  background-color: inherit;
+  height: 100%;
+  width: 100%;
+  opacity: 0.5;
+}
+h3#twitter {
+  position: absolute;
+  bottom: 0.25em;
+  left: 0.25em;
+  background: inherit;
+  white-space: normal;
+}
+h4 {
+  margin: 0;
+  font-weight: normal;
+  white-space: nowrap;
+  style: none;
+  font-size: 0.75em;
+  font-family: "DF", monospace;
+}
+h4 > a {
+  text-decoration: underline;
+}
+h4 > a:hover {
+  font-style: oblique;
+}
+a {
+  text-decoration: none;
+  color: inherit;
+}
+a:hover {
+  cursor: pointer;
+  text-decoration: underline;
+}
+.percentcomplete {
+  font-size: 0.75em;
+  font-family: "DF", monospace;
+  cursor: default !important;
+}
+.percentcomplete:hover {
+  text-decoration: none;
+  font-style: oblique;
+}
+hr {
+  border-style: solid;
+  margin-top: 0.3em;
+  margin-bottom: 0.3em;
+}
+#pastearea {
+  visibility: hidden;
+}
+#pastearea > textarea {
+  width: 99%;
+  height: 100%;
+  min-height: 4.1em;
+  resize: none;
+  background-color: inherit;
+  color: inherit;
+}
