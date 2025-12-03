@@ -91,11 +91,6 @@
             <a tabindex="0">CHANNELS:</a>
             <a
               class="percentcomplete"
-              onclick="channelProgressClicked()"
-              onmouseover="channelProgressTooltip()"
-              onmouseout="tooltip()"
-              onfocus="channelProgressTooltip()"
-              onblur="tooltip()"
               tabindex="0"
             ></a>
           </li>
@@ -106,10 +101,6 @@
             >
             <a
               class="percentcomplete"
-              onmouseenter="channelProgressTooltip('siiva')"
-              onmouseout="tooltip()"
-              onfocus="channelProgressTooltip('siiva')"
-              onblur="tooltip()"
               tabindex="0"
             ></a>
           </li>
@@ -120,10 +111,6 @@
             >
             <a
               class="percentcomplete"
-              onmouseenter="channelProgressTooltip('ttgd')"
-              onmouseout="tooltip()"
-              onfocus="channelProgressTooltip('ttgd')"
-              onblur="tooltip()"
               tabindex="0"
             ></a>
           </li>
@@ -134,10 +121,6 @@
             >
             <a
               class="percentcomplete"
-              onmouseenter="channelProgressTooltip('vavr')"
-              onmouseout="tooltip()"
-              onfocus="channelProgressTooltip('vavr')"
-              onblur="tooltip()"
               tabindex="0"
             ></a>
           </li>
@@ -148,10 +131,6 @@
             >
             <a
               class="percentcomplete"
-              onmouseenter="channelProgressTooltip('bootleg')"
-              onmouseout="tooltip()"
-              onfocus="channelProgressTooltip('bootleg')"
-              onblur="tooltip()"
               tabindex="0"
             ></a>
           </li>
@@ -160,10 +139,6 @@
       <div class="playercontainer">
         <div
           class="ripmetadata"
-          onmouseover="metadataTooltip()"
-          onmouseout="tooltip()"
-          onfocus="metadataTooltip()"
-          onblur="tooltip()"
           tabindex="0"
         >
           <h2>NOW PLAYING:</h2>
@@ -179,13 +154,6 @@
           <textarea></textarea>
           <a
             id="overwrite"
-            onclick="overWriteClicked()"
-            onmouseover="
-              tooltip(
-                'save this string to export your watch history, or paste an exported one here, and click OVERWRITE to import (a blank string clears your watch history)',
-              )
-            "
-            onmouseout="tooltip()"
             >OVERWRITE?</a
           >
         </div>
@@ -209,6 +177,7 @@
       <a id="permahidetwitter">not ever</a>)
     </h3>
     <script src="js/db.js"></script>
+    <script src="js/config.js"></script>
     <!-- Global site tag (gtag.js) - Google Analytics -->
     <script
       async
