@@ -85,10 +85,24 @@ class RandomRipPlayer {
   }
 
   async init() {
+    this.cleanupOldStorage();
     this.setupFirstVidPromise();
     this.bindEvents();
     this.loadTwitterPreference();
     this.initTheme();
+  }
+
+  cleanupOldStorage() {
+    if (Config.browserHasLocalStorage) {
+        if (window.localStorage.getItem(Config.StorageKeys.VID_DB)) {
+            console.log("Cleaning up legacy localstorage vid_db");
+            window.localStorage.removeItem(Config.StorageKeys.VID_DB);
+        }
+        if (window.localStorage.getItem(Config.StorageKeys.BOOTLEG_VID_DB)) {
+            console.log("Cleaning up legacy localstorage bootleg_vid_db");
+            window.localStorage.removeItem(Config.StorageKeys.BOOTLEG_VID_DB);
+        }
+    }
   }
 
   setupFirstVidPromise() {
