@@ -120,39 +120,83 @@ class RandomRipPlayer {
 
   bindEvents() {
     document.addEventListener("DOMContentLoaded", () => {
-      // Setup UI Event Listeners via ID mapping
       const bindings = [
-        ["li#copy > a", () => this.copyRipLink()],
-        ["li#copyplaylist > a", () => this.copyDiscordPlaylist()],
-        ["li#previous > a", () => this.previousVid()],
-        ["li#skip > a", () => this.skipVid()],
-        ["li#autoplay > a", () => this.toggleAutoplay()],
-        ["li#allowrepeats > a", () => this.toggleAllowRepeats()],
-        ["li#autowiki > a", () => this.autoWikiPopup()],
-        ["li#skipduration > a", () => this.skipDurationClicked()],
-        ["li#yearfilter > a", () => this.yearFilterClicked()],
-        ["li#sort > a", () => this.sortClicked()],
-        ["li#skipkfad > a", () => this.skipKFADClicked()],
-        ["li#nowiki > a", () => this.noWikiClicked()],
-        ["li#channels > a", () => this.toggleChannel("")],
-        ["li#siiva > a", () => this.toggleChannel("siiva")],
-        ["li#ttgd > a", () => this.toggleChannel("ttgd")],
-        ["li#vavr > a", () => this.toggleChannel("vavr")],
-        ["li#bootleg > a", () => this.toggleChannel("bootleg")],
-        ["a#hidetwitter", () => this.hideTwitter(false)],
-        ["a#permahidetwitter", () => this.hideTwitter(true)],
-        ["li#channels > a.percentcomplete", () => this.channelProgressClicked()],
-        ["a#overwrite", () => this.overWriteClicked()]
+        ["h4#homepage > a", undefined, "visit my homepage!"],
+        ["li#rip_wiki_link > a", undefined, "opens link to the wiki page for this rip (if it exists) in a new tab. (consider making one if it doesn't!) (hotkey: ctrl-shift-f)"],
+        ["li#copy > a", () => this.copyRipLink(), "copies this rip's youtube url to your clipboard!"],
+        ["li#copyplaylist > a", () => this.copyDiscordPlaylist(), "copies a max length, discord music bot compatible, youtube playlist url to your clipboard! (rips generated based on your current filters)"],
+        ["li#dark > a", undefined, "toggle light/dark mode"], // theme handler attached in initTheme
+        ["li#previous > a", () => this.previousVid(), "go back to the previous rip (hotkeys: ctrl+left shift-p)"],
+        ["li#skip > a", () => this.skipVid(), "pulls up the next random rip according to your filters and sorting (hotkeys: ctrl+right shift-n)"],
+        ["li#autoplay > a", () => this.toggleAutoplay(), "pull up a new random rip (according to filters and sorting) when the current rip ends"],
+        ["li#allowrepeats > a", () => this.toggleAllowRepeats(), "allow rips to be repeated (only available when unsorted) (rip watch history is stored in your localstorage)"],
+        ["li#autowiki > a", () => this.autoWikiPopup(), "creates a popup that will automatically navigate to the currently playing rip's wiki page! (automatic joke lists!)"],
+        ["li#skipduration > a", () => this.skipDurationClicked(), "skip rips that are over the specified duration (click to cycle through durations)"],
+        ["li#yearfilter > a", () => this.yearFilterClicked(), "view only rips from the selected year"],
+        ["li#sort > a", () => this.sortClicked(), "order rips in various ways (click to cycle through order options)"],
+        ["li#skipkfad > a", () => this.skipKFADClicked(), "skip rips that have variants of 'king for a day' in the title"],
+        ["li#nowiki > a", () => this.noWikiClicked(), "only plays rips in need of a wiki article"],
+        ["li#channels > a", () => this.toggleChannel(""), "select specific ripping channels to play random rips from (click this to toggle all channels)"],
+        ["li#siiva > a", () => this.toggleChannel("siiva"), "play rips from SiIvaGunner"],
+        ["li#ttgd > a", () => this.toggleChannel("ttgd"), "play rips from TimmyTurnersGrandDad"],
+        ["li#vavr > a", () => this.toggleChannel("vavr"), "play rips from VvvvvaVvvvvvr"],
+        ["li#bootleg > a", () => this.toggleChannel("bootleg"), "play vids from all other fan channels (inclusion previously based on the siiva wiki list of fan channels) i do not endorse anything here lol"],
+        ["a#hidetwitter", () => this.hideTwitter(false), ""],
+        ["a#permahidetwitter", () => this.hideTwitter(true), ""],
+        ["li#channels > a.percentcomplete", () => this.channelProgressClicked(), ""],
+        ["a#overwrite", () => this.overWriteClicked(), "save this string to export your watch history, or paste an exported one here, and click OVERWRITE to import (a blank string clears your watch history)"]
       ];
 
-      bindings.forEach(([selector, handler]) => {
+      bindings.forEach(([selector, handler, tooltipMessage]) => {
         const el = document.querySelector(selector);
         if (el) {
-          el.onclick = handler;
-          el.onkeydown = (e) => {
-             if (e.code === 'Space' || e.code === 'Enter') handler();
-          };
+          if (handler) {
+            el.onclick = handler;
+            el.onkeydown = (e) => {
+               if (e.code === 'Space' || e.code === 'Enter') handler();
+            };
+          }
+          if (tooltipMessage) {
+            el.onmouseenter = () => this.tooltip(tooltipMessage);
+            el.onmouseout = () => this.tooltip('');
+            el.onfocus = () => this.tooltip(tooltipMessage);
+            el.onblur = () => this.tooltip('');
+          }
         }
+      });
+
+      // Special cases for complex tooltips
+      const channelProgress = document.querySelector("li#channels > a.percentcomplete");
+      if (channelProgress) {
+          const show = () => this.channelProgressTooltip();
+          const hide = () => this.tooltip('');
+          channelProgress.onmouseover = show;
+          channelProgress.onmouseout = hide;
+          channelProgress.onfocus = show;
+          channelProgress.onblur = hide;
+      }
+      
+      const metadata = document.querySelector("div.ripmetadata");
+      if (metadata) {
+          const show = () => this.metadataTooltip();
+          const hide = () => this.tooltip('');
+          metadata.onmouseover = show;
+          metadata.onmouseout = hide;
+          metadata.onfocus = show;
+          metadata.onblur = hide;
+      }
+      
+      // Channel percentage tooltips
+      ['siiva', 'ttgd', 'vavr', 'bootleg'].forEach(ch => {
+          const el = document.querySelector(`li#${ch} > a.percentcomplete`);
+          if(el) {
+              const show = () => this.channelProgressTooltip(ch);
+              const hide = () => this.tooltip('');
+              el.onmouseenter = show;
+              el.onmouseout = hide;
+              el.onfocus = show;
+              el.onblur = hide;
+          }
       });
 
       // Media Session & Keyboard
@@ -285,6 +329,58 @@ class RandomRipPlayer {
   }
   
   // --- Logic ---
+
+  tooltip(msg = "") {
+    const el = document.querySelector("h3#tooltip");
+    if(el) el.textContent = msg;
+  }
+
+  metadataTooltip() {
+    if (this.state.currentChannel && this.state.currentVidTitle) {
+      this.tooltip(`current ${this.state.currentChannel} rip: ${this.state.currentVidTitle}`);
+    }
+  }
+
+  channelProgressTooltip(channel = "") {
+    var num_total_vids, num_unwatched_vids, channelText, parenthetical;
+    if (channel == "") {
+      num_total_vids =
+        this.state.siiva_vids.length +
+        this.state.ttgd_vids.length +
+        this.state.vavr_vids.length +
+        this.state.bootleg_vids.length;
+      num_unwatched_vids =
+        this.state.unwatched.siiva.length +
+        this.state.unwatched.ttgd.length +
+        this.state.unwatched.vavr.length +
+        this.state.unwatched.bootleg.length;
+      channelText = "siiva and all fan channels";
+      parenthetical = "(click to open progress import/export menu)";
+    } else if (channel == "siiva") {
+      num_total_vids = this.state.siiva_vids.length;
+      num_unwatched_vids = this.state.unwatched.siiva.length;
+      channelText = "SiIvaGunner's channel";
+      parenthetical = "";
+    } else if (channel == "ttgd") {
+      num_total_vids = this.state.ttgd_vids.length;
+      num_unwatched_vids = this.state.unwatched.ttgd.length;
+      channelText = "TimmyTurnersGrandDad's channel";
+      parenthetical = "";
+    } else if (channel == "vavr") {
+      num_total_vids = this.state.vavr_vids.length;
+      num_unwatched_vids = this.state.unwatched.vavr.length;
+      channelText = "VvvvvaVvvvvvr's channel";
+      parenthetical = "";
+    } else if (channel == "bootleg") {
+      num_total_vids = this.state.bootleg_vids.length;
+      num_unwatched_vids = this.state.unwatched.bootleg.length;
+      channelText = "all remaining fan channels";
+      parenthetical = "";
+    }
+    this.tooltip(
+      `you've watched ${(num_total_vids - num_unwatched_vids).toLocaleString()} out of ${num_total_vids.toLocaleString()} total rips on ${channelText}, only ${num_unwatched_vids.toLocaleString()} more to go! ${parenthetical}`,
+    );
+  }
 
   updateNowPlaying() {
     document.querySelector("h2#nowplaying").textContent = this.state.currentVidTitle;
@@ -735,7 +831,7 @@ class RandomRipPlayer {
   copyRipLink() {
       const link = "https://www.youtube.com/watch?v=" + this.state.currentVidId;
       this.copyToClipboard(link);
-      tooltip("rip link copied!");
+      this.tooltip("rip link copied!");
       document.querySelector("li#copy > a").textContent = "COPIED.......";
       setTimeout(() => document.querySelector("li#copy > a").textContent = "COPY RIP LINK", 1000);
   }
@@ -746,7 +842,7 @@ class RandomRipPlayer {
       url = url.substring(0, Math.min(url.length, 2000));
       url = url.substring(0, url.lastIndexOf(","));
       this.copyToClipboard(url);
-      tooltip("playlist command copied!");
+      this.tooltip("playlist command copied!");
       document.querySelector("li#copyplaylist > a").textContent = "COPIED...........";
       setTimeout(() => document.querySelector("li#copyplaylist > a").textContent = "GENERATE PLAYLIST", 1000);
   }
