@@ -94,14 +94,14 @@ class RandomRipPlayer {
 
   cleanupOldStorage() {
     if (Config.browserHasLocalStorage) {
-        if (window.localStorage.getItem(Config.StorageKeys.VID_DB)) {
-            console.log("Cleaning up legacy localstorage vid_db");
-            window.localStorage.removeItem(Config.StorageKeys.VID_DB);
-        }
-        if (window.localStorage.getItem(Config.StorageKeys.BOOTLEG_VID_DB)) {
-            console.log("Cleaning up legacy localstorage bootleg_vid_db");
-            window.localStorage.removeItem(Config.StorageKeys.BOOTLEG_VID_DB);
-        }
+      if (window.localStorage.getItem(Config.StorageKeys.VID_DB)) {
+        console.log("Cleaning up legacy localstorage vid_db");
+        window.localStorage.removeItem(Config.StorageKeys.VID_DB);
+      }
+      if (window.localStorage.getItem(Config.StorageKeys.BOOTLEG_VID_DB)) {
+        console.log("Cleaning up legacy localstorage bootleg_vid_db");
+        window.localStorage.removeItem(Config.StorageKeys.BOOTLEG_VID_DB);
+      }
     }
   }
 
@@ -169,7 +169,7 @@ class RandomRipPlayer {
         [
           "li#copyplaylist > a",
           () => this.copyDiscordPlaylist(),
-          "copies a max length, discord music bot compatible, youtube playlist url to your clipboard! (rips generated based on your current filters)",
+          "copies a max length youtube playlist url to your clipboard! (rips generated based on your current filters)",
         ],
         ["li#dark > a", undefined, "toggle light/dark mode"], // theme handler attached in initTheme
         [
@@ -1190,7 +1190,7 @@ class RandomRipPlayer {
 
   copyDiscordPlaylist() {
     const ids = this.getVidIds(500).join(",");
-    let url = ";;play https://www.youtube.com/watch_videos?video_ids=" + ids;
+    let url = "https://www.youtube.com/watch_videos?video_ids=" + ids;
     url = url.substring(0, Math.min(url.length, 2000));
     url = url.substring(0, url.lastIndexOf(","));
     this.copyToClipboard(url);
