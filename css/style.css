@@ -291,7 +291,7 @@ hr {
 .fc-item {
   display: flex;
 
-  align-items: center;
+  align-items: baseline;
 
   gap: 5px;
 
@@ -308,6 +308,10 @@ hr {
   user-select: none;
 
   flex-shrink: 0;
+
+  height: 1em;
+
+  line-height: 1em;
 }
 
 .fc-item:hover {
