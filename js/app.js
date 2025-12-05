@@ -92,6 +92,7 @@ class RandomRipPlayer {
     this.bindEvents();
     this.loadTwitterPreference();
     this.initTheme();
+    this.loadPreferences();
   }
 
   cleanupOldStorage() {
@@ -1109,12 +1110,14 @@ class RandomRipPlayer {
       this.newVid(true);
     }
     this.updateCheckboxes();
+    this.savePreferences();
   }
 
   toggleAllowRepeats() {
     if (!this.state.allowRepeatLock) {
       this.state.allowRepeats = !this.state.allowRepeats;
       this.updateCheckboxes();
+      this.savePreferences();
     }
   }
 
@@ -1166,6 +1169,7 @@ class RandomRipPlayer {
     }
     this.updateCheckboxes();
     this.toggleFanChannelWindow(s.channels.bootleg);
+    this.savePreferences();
   }
 
   toggleFanChannelWindow(show) {
@@ -1291,6 +1295,7 @@ class RandomRipPlayer {
     document.querySelector("li#skipduration > a > span.checkbox").textContent =
       setting[0];
     this.state.durationOfVidToSkip = setting[1];
+    this.savePreferences();
   }
 
   yearFilterClicked() {
@@ -1301,6 +1306,7 @@ class RandomRipPlayer {
     this.state.yearFilterSelected = parseInt(
       this.yearFilterOptions[this.state.yearFilterIndex],
     );
+    this.savePreferences();
   }
 
   sortClicked() {
@@ -1315,6 +1321,7 @@ class RandomRipPlayer {
     this.state.sortOption = this.sortOptions[this.state.sortIndex][0];
     document.querySelector("li#sort > a > span.sortoption").textContent =
       this.state.sortOption;
+    this.savePreferences();
   }
 
   skipKFADClicked() {
@@ -1323,11 +1330,13 @@ class RandomRipPlayer {
     if (this.state.isCurrentVidKFAD && this.state.isSkipKFAD) {
       this.newVid(true);
     }
+    this.savePreferences();
   }
 
   noWikiClicked() {
     this.state.isNoWiki = !this.state.isNoWiki;
     this.updateCheckboxes();
+    this.savePreferences();
   }
 
   loadTwitterPreference() {
@@ -1591,6 +1600,100 @@ class RandomRipPlayer {
         this.player.getCurrentTime() +
         this.player.getDuration(),
     );
+  }
+
+  savePreferences() {
+    if (!Config.browserHasLocalStorage) return;
+    const s = this.state;
+    const prefs = {
+      isAutoplay: s.isAutoplay,
+      allowRepeats: s.allowRepeats,
+      isSkipKFAD: s.isSkipKFAD,
+      isNoWiki: s.isNoWiki,
+      channels: {
+        siiva: s.channels.siiva,
+        ttgd: s.channels.ttgd,
+        vavr: s.channels.vavr,
+        bootleg: s.channels.bootleg,
+      },
+      skipDurationIndex: s.skipDurationIndex,
+      yearFilterIndex: s.yearFilterIndex,
+      sortIndex: s.sortIndex,
+    };
+    window.localStorage.setItem(
+      Config.StorageKeys.USER_PREFERENCES,
+      JSON.stringify(prefs),
+    );
+  }
+
+  loadPreferences() {
+    if (!Config.browserHasLocalStorage) return;
+    const saved = window.localStorage.getItem(
+      Config.StorageKeys.USER_PREFERENCES,
+    );
+    if (!saved) return;
+
+    try {
+      const prefs = JSON.parse(saved);
+      const s = this.state;
+
+      if (prefs.isAutoplay !== undefined) s.isAutoplay = prefs.isAutoplay;
+      if (prefs.allowRepeats !== undefined) s.allowRepeats = prefs.allowRepeats;
+      if (prefs.isSkipKFAD !== undefined) s.isSkipKFAD = prefs.isSkipKFAD;
+      if (prefs.isNoWiki !== undefined) s.isNoWiki = prefs.isNoWiki;
+      if (prefs.channels) {
+        if (prefs.channels.siiva !== undefined)
+          s.channels.siiva = prefs.channels.siiva;
+        if (prefs.channels.ttgd !== undefined)
+          s.channels.ttgd = prefs.channels.ttgd;
+        if (prefs.channels.vavr !== undefined)
+          s.channels.vavr = prefs.channels.vavr;
+        if (prefs.channels.bootleg !== undefined)
+          s.channels.bootleg = prefs.channels.bootleg;
+      }
+
+      if (prefs.skipDurationIndex !== undefined) {
+        s.skipDurationIndex = prefs.skipDurationIndex;
+        const setting = Config.Durations[s.skipDurationIndex];
+        if (setting) {
+          s.durationOfVidToSkip = setting[1];
+          document.querySelector(
+            "li#skipduration > a > span.checkbox",
+          ).textContent = setting[0];
+        }
+      }
+
+      if (prefs.yearFilterIndex !== undefined) {
+        s.yearFilterIndex = prefs.yearFilterIndex;
+        if (s.yearFilterIndex >= this.yearFilterOptions.length)
+          s.yearFilterIndex = 0;
+
+        s.yearFilterSelected = parseInt(
+          this.yearFilterOptions[s.yearFilterIndex],
+        );
+        document.querySelector("li#yearfilter > a > span.checkbox").textContent =
+          this.yearFilterOptions[s.yearFilterIndex];
+      }
+
+      if (prefs.sortIndex !== undefined) {
+        s.sortIndex = prefs.sortIndex;
+        if (s.sortIndex >= this.sortOptions.length) s.sortIndex = 0;
+
+        s.sortOption = this.sortOptions[s.sortIndex][0];
+        if (s.sortIndex >= 3) {
+          s.allowRepeatLock = true;
+          s.allowRepeats = false;
+        } else {
+          s.allowRepeatLock = false;
+        }
+        document.querySelector("li#sort > a > span.sortoption").textContent =
+          s.sortOption;
+      }
+
+      this.updateCheckboxes();
+    } catch (e) {
+      console.error("Failed to load preferences", e);
+    }
   }
 
   autoWikiPopup() {

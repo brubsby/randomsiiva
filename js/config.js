@@ -44,6 +44,7 @@ const Config = {
     SHOW_TWITTER_TIMESTAMP: "twitter_ignore_timestamp",
     WATCHED_VID_IDS: "watched_vid_ids",
     RANDOM_VID: "random_vid",
+    USER_PREFERENCES: "user_preferences",
   },
 
   API: {
