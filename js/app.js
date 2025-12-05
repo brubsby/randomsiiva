@@ -1138,7 +1138,14 @@ class RandomRipPlayer {
       .forEach((ch) => {
         const div = document.createElement("div");
         div.className = "fc-item";
+        div.tabIndex = 0;
         div.onclick = () => this.toggleBootlegChannel(ch);
+        div.onkeydown = (e) => {
+          if (e.code === "Space" || e.code === "Enter") {
+            e.preventDefault();
+            this.toggleBootlegChannel(ch);
+          }
+        };
         div.innerHTML = `<span class="checkbox">${this.state.bootleg_channels[ch] ? "☑" : "☐"}</span> <span>${ch}</span>`;
         list.appendChild(div);
       });

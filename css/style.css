@@ -228,35 +228,89 @@ hr {
 }
 
 .fc-header {
+
   display: flex;
+
   justify-content: space-between;
+
   align-items: center;
+
   margin-bottom: 10px;
+
   border-bottom: 1px solid currentColor;
+
   padding-bottom: 5px;
+
 }
+
+
+
+.fc-header a {
+
+  cursor: pointer;
+
+  text-decoration: none;
+
+  user-select: none;
+
+}
+
+
+
+.fc-header a:hover {
+
+  text-decoration: underline;
+
+}
+
+
 
 .fc-controls {
+
   font-size: 0.75em;
+
 }
+
+
 
 #fanchannellist {
+
   display: flex;
+
   flex-direction: column;
+
   gap: 5px;
+
 }
+
+
 
 .fc-item {
+
   display: flex;
+
   align-items: center;
+
   gap: 5px;
+
   cursor: pointer;
+
   font-size: 0.8em;
+
   white-space: nowrap;
+
   overflow: hidden;
+
   text-overflow: ellipsis;
+
+  user-select: none;
+
 }
 
+
+
 .fc-item:hover {
+
   text-decoration: underline;
+
 }
