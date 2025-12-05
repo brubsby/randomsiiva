@@ -51,6 +51,7 @@ class RandomRipPlayer {
     this.player = null;
     this.autoWikiWindow = null;
     this.firstVidPromise = null;
+    this.currentExportChannel = null;
 
     this.yearFilterYears = Array.from(
       Array(new Date().getUTCFullYear() - Config.YearFilterStart + 1).keys(),
@@ -314,6 +315,11 @@ class RandomRipPlayer {
           el.onmouseout = hide;
           el.onfocus = show;
           el.onblur = hide;
+          el.onclick = () => this.channelProgressClicked(ch);
+          el.onkeydown = (e) => {
+            if (e.code === "Space" || e.code === "Enter")
+              this.channelProgressClicked(ch);
+          };
         }
       });
 
@@ -537,22 +543,22 @@ class RandomRipPlayer {
       num_total_vids = this.state.siiva_vids.length;
       num_unwatched_vids = this.state.unwatched.siiva.length;
       channelText = "SiIvaGunner's channel";
-      parenthetical = "";
+      parenthetical = "(click to open progress import/export menu)";
     } else if (channel == "ttgd") {
       num_total_vids = this.state.ttgd_vids.length;
       num_unwatched_vids = this.state.unwatched.ttgd.length;
       channelText = "TimmyTurnersGrandDad's channel";
-      parenthetical = "";
+      parenthetical = "(click to open progress import/export menu)";
     } else if (channel == "vavr") {
       num_total_vids = this.state.vavr_vids.length;
       num_unwatched_vids = this.state.unwatched.vavr.length;
       channelText = "VvvvvaVvvvvvr's channel";
-      parenthetical = "";
+      parenthetical = "(click to open progress import/export menu)";
     } else if (channel == "bootleg") {
       num_total_vids = this.state.bootleg_vids.length;
       num_unwatched_vids = this.state.unwatched.bootleg.length;
       channelText = "all remaining fan channels";
-      parenthetical = "";
+      parenthetical = "(click to open progress import/export menu)";
     }
     this.tooltip(
       `you've watched ${(num_total_vids - num_unwatched_vids).toLocaleString()} out of ${num_total_vids.toLocaleString()} total rips on ${channelText}, only ${num_unwatched_vids.toLocaleString()} more to go! ${parenthetical}`,
@@ -1229,15 +1235,59 @@ class RandomRipPlayer {
     document.body.removeChild(input);
   }
 
-  channelProgressClicked() {
+  getVidsForChannel(channel) {
+    if (channel === "siiva") return this.state.siiva_vids;
+    if (channel === "ttgd") return this.state.ttgd_vids;
+    if (channel === "vavr") return this.state.vavr_vids;
+    if (channel === "bootleg") return this.state.bootleg_vids;
+    return [];
+  }
+
+  channelProgressClicked(channel = null) {
     const pasteArea = document.querySelector("#pastearea");
     const overwrite = document.querySelector("#overwrite");
     const ta = document.querySelector("#pastearea > textarea");
+    const label = document.querySelector("#pastearea > h4");
 
     const visible = pasteArea.style.visibility === "visible";
+
+    let shouldShow = !visible;
+    if (visible && this.currentExportChannel !== channel) {
+      shouldShow = true;
+    }
+    this.currentExportChannel = channel;
+
+    if (!shouldShow) {
+      pasteArea.style.visibility = "hidden";
+      return;
+    }
+
+    let idsToExport = [];
+    let labelText = "Watch progress string:";
+
+    if (!channel) {
+      idsToExport = this.state.watchedVidIds;
+      labelText = "All Channels watch progress string:";
+    } else {
+      const channelVids = this.getVidsForChannel(channel);
+      const channelVidIds = new Set(channelVids.map((v) => v[0]));
+      idsToExport = this.state.watchedVidIds.filter((id) =>
+        channelVidIds.has(id),
+      );
+
+      const channelNames = {
+        siiva: "SiIvaGunner",
+        ttgd: "TTGD",
+        vavr: "VAVR",
+        bootleg: "Fan Channel",
+      };
+      labelText = `${channelNames[channel]} watch progress string:`;
+    }
+
     overwrite.textContent = "OVERWRITE?";
-    ta.value = btoa(this.state.watchedVidIds.join(","));
-    pasteArea.style.visibility = visible ? "hidden" : "visible";
+    label.textContent = labelText;
+    ta.value = btoa(idsToExport.join(","));
+    pasteArea.style.visibility = "visible";
     ta.select();
   }
 
@@ -1250,8 +1300,17 @@ class RandomRipPlayer {
     else if (txt === "REALLY REALLY SURE?") {
       const ta = document.querySelector("#pastearea > textarea");
       if (!ta.value) {
-        this.state.watchedVidIds = [];
-        btn.textContent = "WATCH HISTORY CLEARED";
+        if (!this.currentExportChannel) {
+          this.state.watchedVidIds = [];
+          btn.textContent = "WATCH HISTORY CLEARED";
+        } else {
+          const channelVids = this.getVidsForChannel(this.currentExportChannel);
+          const channelVidIds = new Set(channelVids.map((v) => v[0]));
+          this.state.watchedVidIds = this.state.watchedVidIds.filter(
+            (id) => !channelVidIds.has(id),
+          );
+          btn.textContent = "CHANNEL HISTORY CLEARED";
+        }
       } else {
         btn.textContent = "PROCESSING...";
         let ids = atob(ta.value).split(",");
@@ -1260,15 +1319,51 @@ class RandomRipPlayer {
           if (/^(Unknown|)$/.test(id)) return false;
           return /^([a-zA-Z0-9_-]{11})$/.test(id);
         });
-        this.state.watchedVidIds = ids;
+
+        if (!this.currentExportChannel) {
+          this.state.watchedVidIds = ids;
+        } else {
+          const channelVids = this.getVidsForChannel(this.currentExportChannel);
+          const channelVidIds = new Set(channelVids.map((v) => v[0]));
+
+          // Remove existing progress for this channel
+          this.state.watchedVidIds = this.state.watchedVidIds.filter(
+            (id) => !channelVidIds.has(id),
+          );
+
+          // Add new progress, strictly filtering for this channel to avoid pollution
+          const validIds = ids.filter((id) => channelVidIds.has(id));
+          this.state.watchedVidIds = this.state.watchedVidIds.concat(validIds);
+        }
+
         window.localStorage.setItem(
           Config.StorageKeys.WATCHED_VID_IDS,
-          JSON.stringify(ids),
+          JSON.stringify(this.state.watchedVidIds),
         );
       }
       setTimeout(() => {
         this.initUnwatched();
-        btn.textContent = `LOADED ${this.state.watchedVidIds.length} WATCHED VIDS...`;
+        let loadedCount;
+        let messageSuffix;
+        if (!this.currentExportChannel) {
+          loadedCount = this.state.watchedVidIds.length;
+          messageSuffix = "WATCHED VIDS...";
+        } else {
+          const channelVids = this.getVidsForChannel(this.currentExportChannel);
+          const channelVidIds = new Set(channelVids.map((v) => v[0]));
+          loadedCount = this.state.watchedVidIds.filter((id) =>
+            channelVidIds.has(id),
+          ).length;
+          const channelNames = {
+            siiva: "SiIvaGunner",
+            ttgd: "TimmyTurnersGrandDad",
+            vavr: "VvvvvaVvvvvvr",
+            bootleg: "Fan Channel",
+          };
+          const channelDisplayName = channelNames[this.currentExportChannel];
+          messageSuffix = `${channelDisplayName.toUpperCase()} WATCHED VIDS...`;
+        }
+        btn.textContent = `LOADED ${loadedCount} ${messageSuffix}`;
       }, 0);
     } else {
       btn.textContent = "OVERWRITE?";
