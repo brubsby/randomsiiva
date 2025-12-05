@@ -225,6 +225,8 @@ hr {
   padding: 10px;
   z-index: 1000;
   box-shadow: 5px 5px 0px rgba(128, 128, 128, 0.5);
+  resize: vertical;
+  min-height: 150px;
 }
 
 .fc-header {
