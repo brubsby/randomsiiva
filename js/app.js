@@ -55,6 +55,8 @@ class RandomRipPlayer {
     this.currentExportChannel = null;
     this.worker = new Worker("js/worker.js?v=19");
     this.workerCallbacks = {};
+    this.sheetsReadyPromise = null;
+    this.dataLoadingInitialized = false;
 
     this.worker.onmessage = (e) => {
       const { id, result, error, success } = e.data;
@@ -485,18 +487,32 @@ class RandomRipPlayer {
     }
   }
 
+  initDataLoading() {
+    if (this.dataLoadingInitialized) return;
+    this.dataLoadingInitialized = true;
+
+    this.checkSheets();
+    this.bootlegReadyPromise = this.checkBootlegSheets();
+
+    Promise.all([
+      this.siivaReadyPromise,
+      this.othersReadyPromise,
+      this.bootlegReadyPromise,
+    ]).then(() => {
+      this.initWatchedVids();
+      window.localStorage.setItem(
+        Config.StorageKeys.RANDOM_VID,
+        this.getRandomUnwatchedSiivaVid(),
+      );
+      this.state.sheetsChecked = true;
+    });
+  }
+
   onPlayerReady() {
     this.updateTitleMaxWidth();
     this.onTitleReady();
     if (!this.state.sheetsChecked) {
-      Promise.all([this.checkSheets(), this.checkBootlegSheets()]).then(() => {
-        this.initWatchedVids();
-        window.localStorage.setItem(
-          Config.StorageKeys.RANDOM_VID,
-          this.getRandomUnwatchedSiivaVid(),
-        );
-        this.state.sheetsChecked = true;
-      });
+      this.initDataLoading();
     }
   }
 
@@ -668,81 +684,93 @@ class RandomRipPlayer {
     );
   }
 
-  async checkSheets() {
-    let storedTimestamp = window.localStorage.getItem(
-      Config.StorageKeys.SHEET_TIMESTAMP,
-    );
-    let dbHasData = false;
-    try {
-      const db = await idbKeyval.get(Config.StorageKeys.VID_DB);
-      if (db && db.length > 0) dbHasData = true;
-    } catch (e) {}
+  checkSheets() {
+    let siivaResolve, othersResolve;
+    this.siivaReadyPromise = new Promise((r) => (siivaResolve = r));
+    this.othersReadyPromise = new Promise((r) => (othersResolve = r));
 
-    if (
-      !Config.browserHasLocalStorage ||
-      !dbHasData ||
-      !(storedTimestamp && parseInt(storedTimestamp) > Date.now())
-    ) {
-      const promises = [];
+    const task = async () => {
+      let storedTimestamp = window.localStorage.getItem(
+        Config.StorageKeys.SHEET_TIMESTAMP,
+      );
+      let dbHasData = false;
+      let db = null;
+      try {
+        db = await idbKeyval.get(Config.StorageKeys.VID_DB);
+        if (db && db.length > 0) dbHasData = true;
+      } catch (e) {}
 
-      if (!this.state.siiva_vids || this.state.siiva_vids.length === 0) {
-        if (this.state.siivaRawJson) {
-          promises.push(Promise.resolve(this.state.siivaRawJson));
-        } else {
-          promises.push(this.makeJSONRequest(Config.API.SIIVA_SHEET_QUERY));
+      if (
+        !Config.browserHasLocalStorage ||
+        !dbHasData ||
+        !(storedTimestamp && parseInt(storedTimestamp) > Date.now())
+      ) {
+        const siivaTask = async () => {
+          let json = this.state.siivaRawJson;
+          if (!json && (!this.state.siiva_vids || !this.state.siiva_vids.length)) {
+             json = await this.makeJSONRequest(Config.API.SIIVA_SHEET_QUERY);
+          }
+          
+          if (json) {
+            const processed = await this.runWorkerTask(
+              "processSheetsJSON",
+              json,
+            );
+            this.state.siiva_vids = processed[0];
+            this.state.siivaRawJson = null;
+          }
+          siivaResolve();
+        };
+
+        const othersTask = async () => {
+          const json = await this.makeJSONRequest(Config.API.OTHER_SHEETS_QUERY);
+          if (json) {
+            const processed = await this.runWorkerTask(
+              "processSheetsJSON",
+              json,
+            );
+            this.state.ttgd_vids = processed[0];
+            this.state.vavr_vids = processed[1];
+          }
+          othersResolve();
+        };
+
+        await Promise.all([siivaTask(), othersTask()]);
+
+        this.state.vid_db = [
+          this.state.siiva_vids,
+          this.state.ttgd_vids,
+          this.state.vavr_vids,
+        ];
+
+        if (Config.browserHasLocalStorage && this.state.siiva_vids.length > 0) {
+          await idbKeyval.set(Config.StorageKeys.VID_DB, this.state.vid_db);
+          window.localStorage.setItem(
+            Config.StorageKeys.SHEET_TIMESTAMP,
+            Date.now() + 86400000,
+          );
         }
       } else {
-        promises.push(Promise.resolve(null));
+        try {
+          this.state.vid_db = db;
+          this.state.siiva_vids = db[0];
+          this.state.ttgd_vids = db[1];
+          this.state.vavr_vids = db[2];
+          siivaResolve();
+          othersResolve();
+        } catch (e) {
+          await idbKeyval.delete(Config.StorageKeys.VID_DB);
+          window.localStorage.removeItem(Config.StorageKeys.SHEET_TIMESTAMP);
+          // Retry by recursively calling (creates new promises, but we need to resolve current ones)
+          // For now, just resolve empty to avoid hangs, or we'd need a more complex retry structure.
+          console.error("IDB read failed", e);
+          siivaResolve();
+          othersResolve();
+        }
       }
+    };
 
-      promises.push(this.makeJSONRequest(Config.API.OTHER_SHEETS_QUERY));
-
-      const [siivaJson, othersJson] = await Promise.all(promises);
-
-      if (siivaJson) {
-        const processedSiiva = await this.runWorkerTask(
-          "processSheetsJSON",
-          siivaJson,
-        );
-        this.state.siiva_vids = processedSiiva[0];
-        this.state.siivaRawJson = null;
-      }
-
-      if (othersJson) {
-        const processedOther = await this.runWorkerTask(
-          "processSheetsJSON",
-          othersJson,
-        );
-        this.state.ttgd_vids = processedOther[0];
-        this.state.vavr_vids = processedOther[1];
-      }
-
-      this.state.vid_db = [
-        this.state.siiva_vids,
-        this.state.ttgd_vids,
-        this.state.vavr_vids,
-      ];
-
-      if (Config.browserHasLocalStorage && this.state.siiva_vids.length > 0) {
-        await idbKeyval.set(Config.StorageKeys.VID_DB, this.state.vid_db);
-        window.localStorage.setItem(
-          Config.StorageKeys.SHEET_TIMESTAMP,
-          Date.now() + 86400000,
-        );
-      }
-    } else {
-      try {
-        this.state.vid_db = await idbKeyval.get(Config.StorageKeys.VID_DB);
-        if (!this.state.vid_db) throw "empty db";
-        this.state.siiva_vids = this.state.vid_db[0];
-        this.state.ttgd_vids = this.state.vid_db[1];
-        this.state.vavr_vids = this.state.vid_db[2];
-      } catch (e) {
-        await idbKeyval.delete(Config.StorageKeys.VID_DB);
-        window.localStorage.removeItem(Config.StorageKeys.SHEET_TIMESTAMP);
-        return this.checkSheets();
-      }
-    }
+    return task();
   }
 
   async checkBootlegSheets() {
@@ -933,7 +961,40 @@ class RandomRipPlayer {
     }
   }
 
-  newVid(markWatched) {
+  async newVid(markWatched) {
+    if (!this.state.sheetsChecked) {
+      this.initDataLoading();
+      const s = this.state;
+      const waits = [];
+      if (s.channels.siiva && !s.siiva_vids.length && this.siivaReadyPromise)
+        waits.push(this.siivaReadyPromise);
+      if (
+        (s.channels.ttgd || s.channels.vavr) &&
+        (!s.ttgd_vids.length || !s.vavr_vids.length) &&
+        this.othersReadyPromise
+      )
+        waits.push(this.othersReadyPromise);
+      if (
+        s.channels.bootleg &&
+        !s.bootleg_vids.length &&
+        this.bootlegReadyPromise
+      )
+        waits.push(this.bootlegReadyPromise);
+
+      if (waits.length > 0) {
+        const skipBtn = document.querySelector("li#skip > a");
+        skipBtn.textContent = "LOADING DB...";
+        try {
+          await Promise.all(waits);
+        } catch (e) {
+          console.error("DB load failed during skip wait", e);
+        } finally {
+          skipBtn.textContent = "NEXT RIP";
+        }
+      }
+      this.initWatchedVids();
+    }
+
     if (markWatched) this.markVidWatched(this.state.currentVidId);
     if (this.state.currentVidId) {
       this.state.history.push(this.state.currentVidId);
