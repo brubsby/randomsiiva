@@ -1153,7 +1153,7 @@ class RandomRipPlayer {
   toggleFanChannelWindow(show) {
     const win = document.getElementById("fanchannelwindow");
     if (show) {
-      win.style.display = "block";
+      win.style.display = "";
       this.renderFanChannelWindow(); // Re-render to ensure updates
     } else {
       win.style.display = "none";

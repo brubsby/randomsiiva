@@ -219,32 +219,29 @@ hr {
   position: absolute;
   top: 10%;
   right: 5%;
-  width: 300px;
+  width: 320px;
   max-height: 80%;
-  overflow-y: auto;
-  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 0;
   z-index: 1000;
   box-shadow: 5px 5px 0px rgba(128, 128, 128, 0.5);
   resize: vertical;
-  min-height: 150px;
+  min-height: 170px;
+  box-sizing: border-box;
 }
 
 .fc-header {
-
   display: flex;
-
   justify-content: space-between;
-
   align-items: center;
-
   margin-bottom: 10px;
-
   border-bottom: 1px solid currentColor;
-
-  padding-bottom: 5px;
-
+  padding: 10px 10px 5px 10px;
   cursor: move;
-
+  flex-shrink: 0;
+  box-sizing: border-box;
 }
 
 
@@ -278,36 +275,78 @@ hr {
 
 
 #fanchannellist {
-
   display: flex;
-
   flex-direction: column;
-
   gap: 5px;
+  overflow-y: auto;
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 0 10px 10px 10px;
+  box-sizing: border-box;
+  scrollbar-width: auto;
+  scrollbar-color: currentColor transparent;
+}
 
+#fanchannellist::-webkit-scrollbar {
+  width: 8px;
+}
+
+#fanchannellist::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+#fanchannellist::-webkit-scrollbar-thumb {
+  background-color: currentColor;
+  border: 2px solid transparent;
+  background-clip: content-box;
+  border-radius: 4px;
 }
 
 
 
 .fc-item {
 
+
+
   display: flex;
+
+
 
   align-items: center;
 
+
+
   gap: 5px;
+
+
 
   cursor: pointer;
 
+
+
   font-size: 0.8em;
+
+
 
   white-space: nowrap;
 
+
+
   overflow: hidden;
+
+
 
   text-overflow: ellipsis;
 
+
+
   user-select: none;
+
+
+
+  flex-shrink: 0;
+
+
 
 }
 
