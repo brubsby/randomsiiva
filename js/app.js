@@ -1290,14 +1290,23 @@ class RandomRipPlayer {
   initTheme() {
     const themeSwitch = (forceDark) => {
       const darkBtn = document.querySelector("li#dark > a");
+      const fcWindow = document.querySelector("#fanchannelwindow");
       if (forceDark) {
         document.body.style.background = "black";
         document.body.style.color = "white";
+        if (fcWindow) {
+          fcWindow.style.background = "black";
+          fcWindow.style.borderColor = "white";
+        }
         document.cookie = "theme=dark; SameSite=Strict";
         if (darkBtn) darkBtn.textContent = "LIGHT";
       } else {
         document.body.style.background = "white";
         document.body.style.color = "black";
+        if (fcWindow) {
+          fcWindow.style.background = "white";
+          fcWindow.style.borderColor = "black";
+        }
         document.cookie = "theme=light; SameSite=Strict";
         if (darkBtn) darkBtn.textContent = "DARK";
       }
