@@ -36,6 +36,7 @@ class RandomRipPlayer {
       ttgd_vids: [],
       vavr_vids: [],
       bootleg_vids: [],
+      bootleg_channels: {}, // keys: channel name, values: boolean (enabled/disabled)
 
       unwatched: {
         siiva: [],
@@ -261,6 +262,17 @@ class RandomRipPlayer {
           "a#overwrite",
           () => this.overWriteClicked(),
           "save this string to export your watch history, or paste an exported one here, and click OVERWRITE to import (a blank string clears your watch history)",
+        ],
+        ["a#fc-close", () => this.toggleFanChannelWindow(false), "close window"],
+        [
+          "a#fc-all",
+          () => this.toggleAllBootlegChannels(true),
+          "select all fan channels",
+        ],
+        [
+          "a#fc-none",
+          () => this.toggleAllBootlegChannels(false),
+          "deselect all fan channels",
         ],
       ];
 
@@ -692,8 +704,11 @@ class RandomRipPlayer {
     );
     let dbHasData = false;
     try {
-      if (await idbKeyval.get(Config.StorageKeys.BOOTLEG_VID_DB))
+      const db = await idbKeyval.get(Config.StorageKeys.BOOTLEG_VID_DB);
+      if (db && db.length > 0 && db[0].length > 9) {
         dbHasData = true;
+        this.state.bootleg_vid_db = db; // Pre-load to check validity
+      }
     } catch (e) {}
 
     if (
@@ -753,9 +768,12 @@ class RandomRipPlayer {
       }
     } else {
       try {
-        this.state.bootleg_vid_db = await idbKeyval.get(
-          Config.StorageKeys.BOOTLEG_VID_DB,
-        );
+        // Already loaded in the validity check above, but let's ensure consistency
+        if (!this.state.bootleg_vid_db) {
+          this.state.bootleg_vid_db = await idbKeyval.get(
+            Config.StorageKeys.BOOTLEG_VID_DB,
+          );
+        }
         if (!this.state.bootleg_vid_db) throw "empty bootleg db";
       } catch (e) {
         await idbKeyval.delete(Config.StorageKeys.BOOTLEG_VID_DB);
@@ -766,7 +784,35 @@ class RandomRipPlayer {
       }
     }
     this.state.bootleg_vids = this.state.bootleg_vid_db;
+    this.initBootlegChannels();
   }
+
+  initBootlegChannels() {
+    // Extract all unique channels
+    const channels = [
+      ...new Set(this.state.bootleg_vids.map((v) => v[9])),
+    ].sort((a, b) => a.localeCompare(b));
+
+    // Load saved preferences
+    let saved = {};
+    try {
+      saved = JSON.parse(
+        window.localStorage.getItem(Config.StorageKeys.BOOTLEG_CHANNELS) ||
+          "{}",
+      );
+    } catch (e) {}
+
+    channels.forEach((ch) => {
+      if (saved.hasOwnProperty(ch)) {
+        this.state.bootleg_channels[ch] = saved[ch];
+      } else {
+        this.state.bootleg_channels[ch] = true; // Default to true
+      }
+    });
+
+    this.renderFanChannelWindow();
+  }
+
 
   // --- Helpers ---
 
@@ -816,7 +862,7 @@ class RandomRipPlayer {
       !["Private", "Deleted"].includes(row[3]) &&
       row[5] != null &&
       row[1] != null;
-    const map = (row) => [
+    const map = (row, channelName) => [
       row[0],
       row[1].replaceAll(/\s{2,}/g, " "),
       false,
@@ -826,9 +872,16 @@ class RandomRipPlayer {
       parseInt(row[8]),
       parseInt(row[9]),
       parseInt(row[10]),
+      channelName,
     ];
-    const process = (n) =>
-      json["valueRanges"][n]["values"].filter(filter).map(map);
+    const process = (n) => {
+      const range = json["valueRanges"][n]["range"];
+      const match = range.match(/^'?(.*?)'?!/);
+      const channelName = match ? match[1] : "Unknown";
+      return json["valueRanges"][n]["values"]
+        .filter(filter)
+        .map((row) => map(row, channelName));
+    };
     return [].concat.apply(
       [],
       Array.from(Array(json["valueRanges"].length).keys()).map(process),
@@ -951,8 +1004,15 @@ class RandomRipPlayer {
       list = list.concat(s.allowRepeats ? s.ttgd_vids : s.unwatched.ttgd);
     if (s.channels.vavr)
       list = list.concat(s.allowRepeats ? s.vavr_vids : s.unwatched.vavr);
-    if (s.channels.bootleg)
-      list = list.concat(s.allowRepeats ? s.bootleg_vids : s.unwatched.bootleg);
+    if (s.channels.bootleg) {
+      const bootlegSource = s.allowRepeats ? s.bootleg_vids : s.unwatched.bootleg;
+      const filteredBootleg = bootlegSource.filter((v) => {
+        // If v[9] (channel name) exists, check if it's enabled. Default to true if missing.
+        const ch = v[9];
+        return !ch || s.bootleg_channels[ch] !== false;
+      });
+      list = list.concat(filteredBootleg);
+    }
 
     if (s.isSkipKFAD) {
       list = list.filter(
@@ -1056,6 +1116,56 @@ class RandomRipPlayer {
       s.channels.siiva = true;
     }
     this.updateCheckboxes();
+    this.toggleFanChannelWindow(s.channels.bootleg);
+  }
+
+  toggleFanChannelWindow(show) {
+    const win = document.getElementById("fanchannelwindow");
+    if (show) {
+      win.style.display = "block";
+      this.renderFanChannelWindow(); // Re-render to ensure updates
+    } else {
+      win.style.display = "none";
+    }
+  }
+
+  renderFanChannelWindow() {
+    const list = document.getElementById("fanchannellist");
+    list.innerHTML = "";
+
+    Object.keys(this.state.bootleg_channels)
+      .sort((a, b) => a.localeCompare(b))
+      .forEach((ch) => {
+        const div = document.createElement("div");
+        div.className = "fc-item";
+        div.onclick = () => this.toggleBootlegChannel(ch);
+        div.innerHTML = `<span class="checkbox">${this.state.bootleg_channels[ch] ? "☑" : "☐"}</span> <span>${ch}</span>`;
+        list.appendChild(div);
+      });
+  }
+
+  toggleBootlegChannel(ch) {
+    this.state.bootleg_channels[ch] = !this.state.bootleg_channels[ch];
+    if (Config.browserHasLocalStorage) {
+      window.localStorage.setItem(
+        Config.StorageKeys.BOOTLEG_CHANNELS,
+        JSON.stringify(this.state.bootleg_channels),
+      );
+    }
+    this.renderFanChannelWindow();
+  }
+
+  toggleAllBootlegChannels(enable) {
+    for (const ch in this.state.bootleg_channels) {
+      this.state.bootleg_channels[ch] = enable;
+    }
+    if (Config.browserHasLocalStorage) {
+      window.localStorage.setItem(
+        Config.StorageKeys.BOOTLEG_CHANNELS,
+        JSON.stringify(this.state.bootleg_channels),
+      );
+    }
+    this.renderFanChannelWindow();
   }
 
   updateCheckboxes() {

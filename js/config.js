@@ -40,6 +40,7 @@ const Config = {
     VID_DB: "vid_db",
     BOOTLEG_SHEET_TIMESTAMP: "bootleg_sheet_timestamp",
     BOOTLEG_VID_DB: "bootleg_vid_db",
+    BOOTLEG_CHANNELS: "bootleg_channels",
     SHOW_TWITTER_TIMESTAMP: "twitter_ignore_timestamp",
     WATCHED_VID_IDS: "watched_vid_ids",
     RANDOM_VID: "random_vid",
