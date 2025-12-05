@@ -343,12 +343,43 @@ class RandomRipPlayer {
         this.previousVid(),
       );
       document.addEventListener("keydown", (e) => this.handleKeydown(e));
+      
+      this.makeDraggable(document.getElementById("fanchannelwindow"));
     });
 
     window.addEventListener("beforeunload", () => {
       if (!!this.autoWikiWindow && !this.autoWikiWindow.closed) {
         this.autoWikiWindow.close();
       }
+    });
+  }
+
+  makeDraggable(el) {
+    const header = el.querySelector(".fc-header");
+    let isDragging = false;
+    let startX, startY, initialLeft, initialTop;
+
+    header.onmousedown = (e) => {
+      if (e.target.tagName === "A") return;
+      isDragging = true;
+      startX = e.clientX;
+      startY = e.clientY;
+      initialLeft = el.offsetLeft;
+      initialTop = el.offsetTop;
+      el.style.right = "auto"; // Switch to left-based positioning
+      e.preventDefault();
+    };
+
+    document.addEventListener("mousemove", (e) => {
+      if (!isDragging) return;
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+      el.style.left = `${initialLeft + dx}px`;
+      el.style.top = `${initialTop + dy}px`;
+    });
+
+    document.addEventListener("mouseup", () => {
+      isDragging = false;
     });
   }
 
