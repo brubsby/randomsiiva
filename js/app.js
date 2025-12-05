@@ -53,7 +53,7 @@ class RandomRipPlayer {
     this.autoWikiWindow = null;
     this.firstVidPromise = null;
     this.currentExportChannel = null;
-    this.worker = new Worker("js/worker.js?v=19");
+    this.worker = new Worker("js/worker.js?v=20");
     this.workerCallbacks = {};
     this.sheetsReadyPromise = null;
     this.dataLoadingInitialized = false;
