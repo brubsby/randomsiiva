@@ -2,7 +2,7 @@ class RandomRipPlayer {
   constructor() {
     this.state = {
       currentVidId: null,
-      previousVidId: null,
+      history: [],
       currentVidTitle: null,
       isCurrentVidKFAD: false,
       previousChannel: null,
@@ -959,11 +959,8 @@ class RandomRipPlayer {
     this.newVid(true);
   }
   previousVid() {
-    if (this.state.previousVidId) {
-      [this.state.currentVidId, this.state.previousVidId] = [
-        this.state.previousVidId,
-        this.state.currentVidId,
-      ];
+    if (this.state.history.length > 0) {
+      this.state.currentVidId = this.state.history.pop();
       this.state.isInfoReady = false;
       this.player.loadVideoById(this.state.currentVidId);
       this.player.playVideo();
@@ -972,14 +969,14 @@ class RandomRipPlayer {
 
   newVid(markWatched) {
     if (markWatched) this.markVidWatched(this.state.currentVidId);
-    this.state.previousVidId = this.state.currentVidId;
+    if (this.state.currentVidId) {
+      this.state.history.push(this.state.currentVidId);
+    }
     this.state.currentVidId = this.nextVidId();
     window.localStorage.setItem(
       Config.StorageKeys.RANDOM_VID,
       this.getRandomUnwatchedSiivaVid(),
     );
-    this.state.previousChannel = this.state.currentChannel;
-    this.state.isPreviousVidKFAD = this.state.isCurrentVidKFAD;
     this.state.isInfoReady = false;
     this.player.loadVideoById(this.state.currentVidId);
     this.player.playVideo();
