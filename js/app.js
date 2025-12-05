@@ -53,6 +53,17 @@ class RandomRipPlayer {
     this.autoWikiWindow = null;
     this.firstVidPromise = null;
     this.currentExportChannel = null;
+    this.worker = new Worker("js/worker.js?v=19");
+    this.workerCallbacks = {};
+
+    this.worker.onmessage = (e) => {
+      const { id, result, error, success } = e.data;
+      if (this.workerCallbacks[id]) {
+        if (success) this.workerCallbacks[id].resolve(result);
+        else this.workerCallbacks[id].reject(error);
+        delete this.workerCallbacks[id];
+      }
+    };
 
     this.yearFilterYears = Array.from(
       Array(new Date().getUTCFullYear() - Config.YearFilterStart + 1).keys(),
@@ -84,6 +95,14 @@ class RandomRipPlayer {
       ["MOST CMNTS", (v) => v[8], Math.max, (v) => v[5]],
       ["LEAST CMNTS", (v) => v[8], Math.min, (v) => v[5]],
     ];
+  }
+
+  runWorkerTask(type, data) {
+    return new Promise((resolve, reject) => {
+      const id = Date.now() + Math.random();
+      this.workerCallbacks[id] = { resolve, reject };
+      this.worker.postMessage({ type, data, id });
+    });
   }
 
   async init() {
@@ -681,12 +700,19 @@ class RandomRipPlayer {
       const [siivaJson, othersJson] = await Promise.all(promises);
 
       if (siivaJson) {
-        this.state.siiva_vids = this.processSheetsJSON(siivaJson)[0];
+        const processedSiiva = await this.runWorkerTask(
+          "processSheetsJSON",
+          siivaJson,
+        );
+        this.state.siiva_vids = processedSiiva[0];
         this.state.siivaRawJson = null;
       }
 
       if (othersJson) {
-        const processedOther = this.processSheetsJSON(othersJson);
+        const processedOther = await this.runWorkerTask(
+          "processSheetsJSON",
+          othersJson,
+        );
         this.state.ttgd_vids = processedOther[0];
         this.state.vavr_vids = processedOther[1];
       }
@@ -766,7 +792,10 @@ class RandomRipPlayer {
         }, {});
 
         if (combined.valueRanges) {
-          this.state.bootleg_vid_db = this.processBootlegSheetsJSON(combined);
+          this.state.bootleg_vid_db = await this.runWorkerTask(
+            "processBootlegSheetsJSON",
+            combined,
+          );
           if (Config.browserHasLocalStorage) {
             await idbKeyval.set(
               Config.StorageKeys.BOOTLEG_VID_DB,
@@ -860,69 +889,6 @@ class RandomRipPlayer {
   chunk(arr, size) {
     if (arr.length <= size) return [arr];
     return [arr.slice(0, size), ...this.chunk(arr.slice(size), size)];
-  }
-
-  processSheetsJSON(json) {
-    const filter = (row) => !["Private", "Deleted"].includes(row[3]);
-    const map = (row) => [
-      row[0],
-      row[1].replaceAll(/\s{2,}/g, " "),
-      row[2] == "Documented" ? true : row[2] == "Undocumented" ? false : null,
-      Date.parse(row[4].replace(/\s+/, " ")),
-      this.parseISO8601DurationToSeconds(row[5]),
-      parseInt(row[7]),
-      parseInt(row[8]),
-      parseInt(row[9]),
-      parseInt(row[10]),
-    ];
-    return json.valueRanges.map((range) =>
-      range.values.filter(filter).map(map),
-    );
-  }
-
-  processBootlegSheetsJSON(json) {
-    const filter = (row) =>
-      !["Private", "Deleted"].includes(row[3]) &&
-      row[5] != null &&
-      row[1] != null;
-    const map = (row, channelName) => [
-      row[0],
-      row[1].replaceAll(/\s{2,}/g, " "),
-      false,
-      Date.parse(row[4].replace(/\s+/, " ")),
-      this.parseISO8601DurationToSeconds(row[5]),
-      parseInt(row[7]),
-      parseInt(row[8]),
-      parseInt(row[9]),
-      parseInt(row[10]),
-      channelName,
-    ];
-    const process = (n) => {
-      const range = json["valueRanges"][n]["range"];
-      const match = range.match(/^'?(.*?)'?!/);
-      const channelName = match ? match[1] : "Unknown";
-      return json["valueRanges"][n]["values"]
-        .filter(filter)
-        .map((row) => map(row, channelName));
-    };
-    return [].concat.apply(
-      [],
-      Array.from(Array(json["valueRanges"].length).keys()).map(process),
-    );
-  }
-
-  parseISO8601DurationToSeconds(iso8601Duration) {
-    var matches = iso8601Duration.match(Config.Regex.ISO8601Duration);
-    return matches
-      ? (matches[1] === undefined ? 1 : -1) *
-          ((matches[2] === undefined ? 0 : parseInt(matches[2])) * 31536000 +
-            (matches[3] === undefined ? 0 : parseInt(matches[3])) * 2592000 +
-            (matches[4] === undefined ? 0 : parseInt(matches[4])) * 604800 +
-            (matches[5] === undefined ? 0 : parseInt(matches[5])) * 86400 +
-            (matches[6] === undefined ? 0 : parseInt(matches[6])) * 3600 +
-            (matches[7] === undefined ? 0 : parseInt(matches[7])) * 60 +
-            (matches[8] === undefined ? 0 : parseInt(matches[8])))
-      : 0;
   }
 
   initWatchedVids() {
