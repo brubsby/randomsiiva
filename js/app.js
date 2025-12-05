@@ -131,7 +131,7 @@ class RandomRipPlayer {
             throw "No cached db";
           }
         } catch (e) {
-          const responseText = this.makeGetRequest(Config.API.SHEETS_QUERY);
+          const responseText = await this.makeGetRequest(Config.API.SHEETS_QUERY);
           if (responseText) {
             try {
               this.state.sheetsJson = JSON.parse(responseText);
@@ -660,7 +660,7 @@ class RandomRipPlayer {
       !(storedTimestamp && parseInt(storedTimestamp) > Date.now())
     ) {
       if (!this.state.sheetsJson) {
-        const json = this.makeJSONRequest(Config.API.SHEETS_QUERY);
+        const json = await this.makeJSONRequest(Config.API.SHEETS_QUERY);
         if (json) {
           this.state.sheetsJson = json;
           this.state.vid_db = this.processSheetsJSON(json);
@@ -713,7 +713,7 @@ class RandomRipPlayer {
       !dbHasData ||
       !(storedTimestamp && parseInt(storedTimestamp) > Date.now())
     ) {
-      const namesJson = this.makeJSONRequest(Config.API.BOOTLEG_SHEET_QUERY);
+      const namesJson = await this.makeJSONRequest(Config.API.BOOTLEG_SHEET_QUERY);
       if (namesJson && namesJson["sheets"]) {
         const names = namesJson["sheets"]
           .map((s) => s.properties.title)
@@ -724,14 +724,14 @@ class RandomRipPlayer {
           );
 
         const batches = this.chunk(names, 100);
-        const jsons = batches.map((batch) =>
+        const jsons = await Promise.all(batches.map((batch) =>
           this.makeJSONRequest(
             Config.API.BOOTLEG_SHEETS_BATCH_QUERY +
               batch
                 .map((n) => "&ranges=" + encodeURIComponent(n) + "!A2:K")
                 .join(""),
           ),
-        );
+        ));
 
         const combined = jsons.reduce((acc, curr) => {
           if (!curr) return acc;
@@ -812,17 +812,20 @@ class RandomRipPlayer {
 
   // --- Helpers ---
 
-  makeGetRequest(url) {
-    var Httpreq = new XMLHttpRequest();
-    Httpreq.open("GET", url, false);
-    Httpreq.send(null);
-    if (Httpreq.status !== 200) return null;
-    return Httpreq.responseText;
+  async makeGetRequest(url) {
+    try {
+      const response = await fetch(url);
+      if (!response.ok) return null;
+      return await response.text();
+    } catch (e) {
+      console.error("Fetch failed", url, e);
+      return null;
+    }
   }
 
-  makeJSONRequest(url) {
+  async makeJSONRequest(url) {
     try {
-      const text = this.makeGetRequest(url);
+      const text = await this.makeGetRequest(url);
       return text ? JSON.parse(text) : null;
     } catch (e) {
       console.error("Request failed", url, e);
