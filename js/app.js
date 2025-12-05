@@ -1132,6 +1132,14 @@ class RandomRipPlayer {
       }
     } else if (ch) {
       s.channels[ch] = !s.channels[ch];
+      if (ch === "bootleg" && s.channels.bootleg) {
+        const anyBootlegActive = Object.values(s.bootleg_channels).some(
+          (x) => x,
+        );
+        if (!anyBootlegActive) {
+          this.toggleAllBootlegChannels(true);
+        }
+      }
     } else {
       const all =
         s.channels.siiva &&
