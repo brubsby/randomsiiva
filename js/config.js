@@ -52,11 +52,8 @@ const Config = {
     PUBLIC_SHEETS_API_KEY: "AIzaSyAzQyLBAF5kiOZHVLVMLfs_rn1wdCMVnmM",
     SHEET_ID: "1B7b9jEaWiqZI8Z8CzvFN1cBvLVYwjb5xzhWtrgs4anI",
     BOOTLEG_SHEET_ID: "1Q_L84zZ2rzS57ZcDcCdmxMsguqjpnbLGr5_QVX5LVKA",
-    RANGES: [
-      "SiIvaGunner!A2:K",
-      "TimmyTurnersGrandDad!A2:K",
-      "VvvvvaVvvvvvr!A2:K",
-    ],
+    SIIVA_RANGE: ["SiIvaGunner!A2:K"],
+    OTHER_RANGES: ["TimmyTurnersGrandDad!A2:K", "VvvvvaVvvvvvr!A2:K"],
     CHANNEL_BLOCKLIST: [7792455746889010, 1256373471545759],
     RIP_BLOCKLIST: [],
   },
@@ -108,6 +105,7 @@ Config.API.KEY = isLocal
   ? Config.API.TESTING_KEY
   : Config.API.PUBLIC_SHEETS_API_KEY;
 
-Config.API.SHEETS_QUERY = `https://sheets.googleapis.com/v4/spreadsheets/${Config.API.SHEET_ID}/values:batchGet?key=${Config.API.KEY}&ranges=${Config.API.RANGES.join("&ranges=")}`;
+Config.API.SIIVA_SHEET_QUERY = `https://sheets.googleapis.com/v4/spreadsheets/${Config.API.SHEET_ID}/values:batchGet?key=${Config.API.KEY}&ranges=${Config.API.SIIVA_RANGE.join("&ranges=")}`;
+Config.API.OTHER_SHEETS_QUERY = `https://sheets.googleapis.com/v4/spreadsheets/${Config.API.SHEET_ID}/values:batchGet?key=${Config.API.KEY}&ranges=${Config.API.OTHER_RANGES.join("&ranges=")}`;
 Config.API.BOOTLEG_SHEET_QUERY = `https://sheets.googleapis.com/v4/spreadsheets/${Config.API.BOOTLEG_SHEET_ID}?key=${Config.API.KEY}`;
 Config.API.BOOTLEG_SHEETS_BATCH_QUERY = `https://sheets.googleapis.com/v4/spreadsheets/${Config.API.BOOTLEG_SHEET_ID}/values:batchGet?key=${Config.API.KEY}`;

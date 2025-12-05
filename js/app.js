@@ -131,22 +131,26 @@ class RandomRipPlayer {
             throw "No cached db";
           }
         } catch (e) {
-          const responseText = await this.makeGetRequest(Config.API.SHEETS_QUERY);
-          if (responseText) {
+          const json = await this.makeJSONRequest(Config.API.SIIVA_SHEET_QUERY);
+          if (json) {
+            this.state.siivaRawJson = json;
             try {
-              this.state.sheetsJson = JSON.parse(responseText);
-              this.state.vid_db = this.processSheetsJSON(this.state.sheetsJson);
-              const randomVid =
-                this.state.vid_db[0][
-                  Math.floor(this.state.vid_db[0].length * Math.random())
-                ][0];
+              const rows = json.valueRanges[0].values;
+              let vidId = "rEcOzjg7vBU";
+              for (let i = 0; i < 50; i++) {
+                const row = rows[Math.floor(Math.random() * rows.length)];
+                if (row[0] && !["Private", "Deleted"].includes(row[3])) {
+                  vidId = row[0];
+                  break;
+                }
+              }
               window.localStorage.setItem(
                 Config.StorageKeys.RANDOM_VID,
-                randomVid,
+                vidId,
               );
-              resolve(randomVid);
-            } catch (parseError) {
-              console.error("Error parsing sheets", parseError);
+              resolve(vidId);
+            } catch (pickError) {
+              console.error("Error fast-picking video", pickError);
               resolve("rEcOzjg7vBU");
             }
           } else {
@@ -651,7 +655,8 @@ class RandomRipPlayer {
     );
     let dbHasData = false;
     try {
-      if (await idbKeyval.get(Config.StorageKeys.VID_DB)) dbHasData = true;
+      const db = await idbKeyval.get(Config.StorageKeys.VID_DB);
+      if (db && db.length > 0) dbHasData = true;
     } catch (e) {}
 
     if (
@@ -659,21 +664,40 @@ class RandomRipPlayer {
       !dbHasData ||
       !(storedTimestamp && parseInt(storedTimestamp) > Date.now())
     ) {
-      if (!this.state.sheetsJson) {
-        const json = await this.makeJSONRequest(Config.API.SHEETS_QUERY);
-        if (json) {
-          this.state.sheetsJson = json;
-          this.state.vid_db = this.processSheetsJSON(json);
-        } else if (dbHasData) {
-          this.state.vid_db = await idbKeyval.get(Config.StorageKeys.VID_DB);
+      const promises = [];
+
+      if (!this.state.siiva_vids || this.state.siiva_vids.length === 0) {
+        if (this.state.siivaRawJson) {
+          promises.push(Promise.resolve(this.state.siivaRawJson));
         } else {
-          console.error("Critical: No sheet data");
-          return;
+          promises.push(this.makeJSONRequest(Config.API.SIIVA_SHEET_QUERY));
         }
-      } else if (!this.state.vid_db) {
-        this.state.vid_db = this.processSheetsJSON(this.state.sheetsJson);
+      } else {
+        promises.push(Promise.resolve(null));
       }
-      if (Config.browserHasLocalStorage && this.state.sheetsJson) {
+
+      promises.push(this.makeJSONRequest(Config.API.OTHER_SHEETS_QUERY));
+
+      const [siivaJson, othersJson] = await Promise.all(promises);
+
+      if (siivaJson) {
+        this.state.siiva_vids = this.processSheetsJSON(siivaJson)[0];
+        this.state.siivaRawJson = null;
+      }
+
+      if (othersJson) {
+        const processedOther = this.processSheetsJSON(othersJson);
+        this.state.ttgd_vids = processedOther[0];
+        this.state.vavr_vids = processedOther[1];
+      }
+
+      this.state.vid_db = [
+        this.state.siiva_vids,
+        this.state.ttgd_vids,
+        this.state.vavr_vids,
+      ];
+
+      if (Config.browserHasLocalStorage && this.state.siiva_vids.length > 0) {
         await idbKeyval.set(Config.StorageKeys.VID_DB, this.state.vid_db);
         window.localStorage.setItem(
           Config.StorageKeys.SHEET_TIMESTAMP,
@@ -684,15 +708,15 @@ class RandomRipPlayer {
       try {
         this.state.vid_db = await idbKeyval.get(Config.StorageKeys.VID_DB);
         if (!this.state.vid_db) throw "empty db";
+        this.state.siiva_vids = this.state.vid_db[0];
+        this.state.ttgd_vids = this.state.vid_db[1];
+        this.state.vavr_vids = this.state.vid_db[2];
       } catch (e) {
         await idbKeyval.delete(Config.StorageKeys.VID_DB);
         window.localStorage.removeItem(Config.StorageKeys.SHEET_TIMESTAMP);
         return this.checkSheets();
       }
     }
-    this.state.siiva_vids = this.state.vid_db[0];
-    this.state.ttgd_vids = this.state.vid_db[1];
-    this.state.vavr_vids = this.state.vid_db[2];
   }
 
   async checkBootlegSheets() {
@@ -851,9 +875,9 @@ class RandomRipPlayer {
       parseInt(row[9]),
       parseInt(row[10]),
     ];
-    const process = (n) =>
-      json["valueRanges"][n]["values"].filter(filter).map(map);
-    return [0, 1, 2].map(process);
+    return json.valueRanges.map((range) =>
+      range.values.filter(filter).map(map),
+    );
   }
 
   processBootlegSheetsJSON(json) {
