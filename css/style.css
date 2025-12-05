@@ -244,35 +244,21 @@ hr {
   box-sizing: border-box;
 }
 
-
-
 .fc-header a {
-
   cursor: pointer;
 
   text-decoration: none;
 
   user-select: none;
-
 }
-
-
 
 .fc-header a:hover {
-
   text-decoration: underline;
-
 }
-
-
 
 .fc-controls {
-
   font-size: 0.75em;
-
 }
-
-
 
 #fanchannellist {
   display: flex;
@@ -302,58 +288,28 @@ hr {
   border-radius: 4px;
 }
 
-
-
 .fc-item {
-
-
-
   display: flex;
-
-
 
   align-items: center;
 
-
-
   gap: 5px;
-
-
 
   cursor: pointer;
 
-
-
   font-size: 0.8em;
-
-
 
   white-space: nowrap;
 
-
-
   overflow: hidden;
-
-
 
   text-overflow: ellipsis;
 
-
-
   user-select: none;
 
-
-
   flex-shrink: 0;
-
-
-
 }
 
-
-
 .fc-item:hover {
-
   text-decoration: underline;
-
 }

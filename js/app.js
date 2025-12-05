@@ -263,7 +263,11 @@ class RandomRipPlayer {
           () => this.overWriteClicked(),
           "save this string to export your watch history, or paste an exported one here, and click OVERWRITE to import (a blank string clears your watch history)",
         ],
-        ["a#fc-close", () => this.toggleFanChannelWindow(false), "close window"],
+        [
+          "a#fc-close",
+          () => this.toggleFanChannelWindow(false),
+          "close window",
+        ],
         [
           "a#fc-all",
           () => this.toggleAllBootlegChannels(true),
@@ -343,7 +347,7 @@ class RandomRipPlayer {
         this.previousVid(),
       );
       document.addEventListener("keydown", (e) => this.handleKeydown(e));
-      
+
       this.makeDraggable(document.getElementById("fanchannelwindow"));
     });
 
@@ -844,7 +848,6 @@ class RandomRipPlayer {
     this.renderFanChannelWindow();
   }
 
-
   // --- Helpers ---
 
   makeGetRequest(url) {
@@ -1036,7 +1039,9 @@ class RandomRipPlayer {
     if (s.channels.vavr)
       list = list.concat(s.allowRepeats ? s.vavr_vids : s.unwatched.vavr);
     if (s.channels.bootleg) {
-      const bootlegSource = s.allowRepeats ? s.bootleg_vids : s.unwatched.bootleg;
+      const bootlegSource = s.allowRepeats
+        ? s.bootleg_vids
+        : s.unwatched.bootleg;
       const filteredBootleg = bootlegSource.filter((v) => {
         // If v[9] (channel name) exists, check if it's enabled. Default to true if missing.
         const ch = v[9];
