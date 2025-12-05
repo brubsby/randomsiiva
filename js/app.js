@@ -1691,6 +1691,9 @@ class RandomRipPlayer {
       }
 
       this.updateCheckboxes();
+      if (s.channels.bootleg) {
+        this.toggleFanChannelWindow(true);
+      }
     } catch (e) {
       console.error("Failed to load preferences", e);
     }
