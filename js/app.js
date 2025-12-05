@@ -854,11 +854,12 @@ class RandomRipPlayer {
     } else {
       this.state.watchedVidIds = [];
     }
-    this.filterUnwatched();
+    this.initUnwatched();
   }
 
-  filterUnwatched() {
-    const isUnwatched = (x) => !this.state.watchedVidIds.includes(x[0]);
+  initUnwatched() {
+    const watchedSet = new Set(this.state.watchedVidIds);
+    const isUnwatched = (x) => !watchedSet.has(x[0]);
     this.state.unwatched.siiva = this.state.siiva_vids.filter(isUnwatched);
     this.state.unwatched.ttgd = this.state.ttgd_vids.filter(isUnwatched);
     this.state.unwatched.vavr = this.state.vavr_vids.filter(isUnwatched);
@@ -905,7 +906,17 @@ class RandomRipPlayer {
         Config.StorageKeys.WATCHED_VID_IDS,
         JSON.stringify(this.state.watchedVidIds),
       );
-      this.filterUnwatched();
+
+      const notVidFilter = (x) => x[0] !== id;
+      this.state.unwatched.siiva =
+        this.state.unwatched.siiva.filter(notVidFilter);
+      this.state.unwatched.ttgd =
+        this.state.unwatched.ttgd.filter(notVidFilter);
+      this.state.unwatched.vavr =
+        this.state.unwatched.vavr.filter(notVidFilter);
+      this.state.unwatched.bootleg =
+        this.state.unwatched.bootleg.filter(notVidFilter);
+      this.updateWatchPercentages();
     }
   }
 
@@ -1252,7 +1263,7 @@ class RandomRipPlayer {
         );
       }
       setTimeout(() => {
-        this.filterUnwatched();
+        this.initUnwatched();
         btn.textContent = `LOADED ${this.state.watchedVidIds.length} WATCHED VIDS...`;
       }, 0);
     } else {
