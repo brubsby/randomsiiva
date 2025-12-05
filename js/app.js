@@ -1646,6 +1646,7 @@ class RandomRipPlayer {
       skipDurationIndex: s.skipDurationIndex,
       yearRange: s.yearRange,
       isYearRangeMode: s.isYearRangeMode,
+      yearFilterIndex: s.yearFilterIndex,
       sortIndex: s.sortIndex,
     };
     window.localStorage.setItem(
@@ -1694,6 +1695,13 @@ class RandomRipPlayer {
       if (prefs.yearRange !== undefined) s.yearRange = prefs.yearRange;
       if (prefs.isYearRangeMode !== undefined)
         s.isYearRangeMode = prefs.isYearRangeMode;
+
+      if (prefs.yearFilterIndex !== undefined) {
+        s.yearFilterIndex = prefs.yearFilterIndex;
+        s.yearFilterSelected = parseInt(
+          this.yearFilterOptions[s.yearFilterIndex],
+        );
+      }
 
       if (!s.yearRange) {
         s.yearRange = [Config.YearFilterStart, new Date().getUTCFullYear()];
