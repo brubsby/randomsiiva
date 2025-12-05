@@ -371,6 +371,8 @@ class RandomRipPlayer {
       initialLeft = el.offsetLeft;
       initialTop = el.offsetTop;
       el.style.right = "auto"; // Switch to left-based positioning
+      el.style.left = initialLeft + "px";
+      el.style.top = initialTop + "px";
       e.preventDefault();
     };
 
