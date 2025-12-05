@@ -32,146 +32,149 @@
       property="og:description"
       content="Play random rips from SiIvaGunner and (most) SiIvaGunner fan channels."
     />
-        <link rel="stylesheet" href="css/style.css?v=16" />
-      </head>
-      <body>
-        <div id="tooltipcontainer">
-          <h3 id="tooltip">&nbsp</h3>
-          <div id="tooltipbg"></div>
+    <link rel="stylesheet" href="css/style.css?v=18" />
+  </head>
+  <body>
+    <div id="tooltipcontainer">
+      <h3 id="tooltip">&nbsp</h3>
+      <div id="tooltipbg"></div>
+    </div>
+    <div id="fanchannelwindow" style="display: none">
+      <div class="fc-header">
+        <h3>FAN CHANNELS</h3>
+        <div class="fc-controls">
+          <a id="fc-all" tabindex="0">ALL</a> /
+          <a id="fc-none" tabindex="0">NONE</a>
         </div>
-        <div id="fanchannelwindow" style="display: none">
-          <div class="fc-header">
-            <h3>FAN CHANNELS</h3>
-            <div class="fc-controls">
-              <a id="fc-all" tabindex="0">ALL</a> /
-              <a id="fc-none" tabindex="0">NONE</a>
-            </div>
-            <a id="fc-close" tabindex="0">[X]</a>
-          </div>
-          <div id="fanchannellist">Loading...</div>
-        </div>
-        <div class="container">
-          <div class="menu">
-            <h4 id="homepage">
-              <a
-                href="https://brubsby.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                tabindex="1"
-                >BRUBSBY'S</a
-              >
-            </h4>
-            <h1>RANDOM RIP PLAYER</h1>
-            <ol id="links">
-              <li id="skip"><a tabindex="0">NEXT RIP</a></li>
-              <li id="previous"><a tabindex="0">PREVIOUS RIP</a></li>
-              <li id="autoplay">
-                <a tabindex="0"><span class="checkbox">☑</span> AUTOPLAY</a>
-              </li>
-              <hr />
-              <li id="rip_wiki_link">
-                <a target="_blank" tabindex="0" rel="noopener noreferrer"
-                  >RIP WIKI PAGE</a
-                >
-              </li>
-              <li id="autowiki"><a tabindex="0">AUTO WIKI POPUP</a></li>
-              <li id="copy"><a tabindex="0">COPY RIP LINK</a></li>
-              <li id="copyplaylist"><a tabindex="0">GENERATE PLAYLIST</a></li>
-              <li id="dark"><a tabindex="0">LIGHT</a></li>
-              <hr />
-              <li id="sort">
-                <a tabindex="0">ORDER: <span class="sortoption">RANDOM</span></a>
-              </li>
-              <li id="skipduration">
-                <a tabindex="0">SKIP LONG RIPS <span class="checkbox">☒</span></a>
-              </li>
-              <li id="yearfilter">
-                <a tabindex="0"><span class="year-label">YEAR:</span> <span class="checkbox">ALL</span></a>
-              </li>
-              <li id="skipkfad">
-                <a tabindex="0"><span class="checkbox">☐</span> SKIP KFAD</a>
-              </li>
-              <li id="nowiki">
-                <a tabindex="0"><span class="checkbox">☐</span> NO WIKI ONLY</a>
-              </li>
-              <li id="allowrepeats">
-                <a tabindex="0"><span class="checkbox">☐</span> ALLOW REPEATS</a>
-              </li>
-              <li id="channels">
-                <a tabindex="0">CHANNELS:</a>
-                <a class="percentcomplete" tabindex="0"></a>
-              </li>
-              <li id="siiva">
-                <a tabindex="0">
-                  <span class="checkbox">☑</span>
-                  <span class="channel">SIIVA</span></a
-                >
-                <a class="percentcomplete" tabindex="0"></a>
-              </li>
-              <li id="ttgd">
-                <a tabindex="0">
-                  <span class="checkbox">☐</span>
-                  <span class="channel">TTGD</span></a
-                >
-                <a class="percentcomplete" tabindex="0"></a>
-              </li>
-              <li id="vavr">
-                <a tabindex="0">
-                  <span class="checkbox">☐</span>
-                  <span class="channel">VAVR</span></a
-                >
-                <a class="percentcomplete" tabindex="0"></a>
-              </li>
-              <li id="bootleg">
-                <a tabindex="0">
-                  <span class="checkbox">☐</span>
-                  <span class="channel">OTHER</span></a
-                >
-                <a class="percentcomplete" tabindex="0"></a>
-              </li>
-            </ol>
-          </div>
-          <div class="playercontainer">
-            <div class="ripmetadata" tabindex="0">
-              <h2>NOW PLAYING:</h2>
-              <h2 id="nowplaying">&nbsp</h2>
-              <h2 id="author">&nbsp</h2>
-            </div>
-            <div style="display: none" id="timeover"></div>
-            <div class="embedcontainer">
-              <div id="player">Loading...</div>
-            </div>
-            <div id="pastearea">
-              <h4>watch progress string:</h4>
-              <textarea></textarea>
-              <a id="overwrite">OVERWRITE?</a>
-            </div>
-          </div>
-        </div>
-        <h3 id="twitter" style="display: none">
+        <a id="fc-close" tabindex="0">[X]</a>
+      </div>
+      <div id="fanchannellist">Loading...</div>
+    </div>
+    <div class="container">
+      <div class="menu">
+        <h4 id="homepage">
           <a
+            href="https://brubsby.com"
             target="_blank"
             rel="noopener noreferrer"
-            href="https://twitter.com/brubsby"
-            >follow me on twitter</a
+            tabindex="1"
+            >BRUBSBY'S</a
           >
-          or
-          <a
-            target="_blank"
-            rel="noopener noreferrer"
-            href="https://ko-fi.com/brubsby"
-            >buy me a coffee</a
-          >
-          if you like the page! (<a id="hidetwitter">not today</a> /
-          <a id="permahidetwitter">not ever</a>)
-        </h3>
-        <script src="js/db.js"></script>
-        <script src="js/config.js"></script>
-        <!-- Global site tag (gtag.js) - Google Analytics -->
-        <script
-          async
-          src="https://www.googletagmanager.com/gtag/js?id=UA-152720878-1"
-        ></script>
-        <script src="js/app.js?v=16"></script>
-      </body>
-    </html>
+        </h4>
+        <h1>RANDOM RIP PLAYER</h1>
+        <ol id="links">
+          <li id="skip"><a tabindex="0">NEXT RIP</a></li>
+          <li id="previous"><a tabindex="0">PREVIOUS RIP</a></li>
+          <li id="autoplay">
+            <a tabindex="0"><span class="checkbox">☑</span> AUTOPLAY</a>
+          </li>
+          <hr />
+          <li id="rip_wiki_link">
+            <a target="_blank" tabindex="0" rel="noopener noreferrer"
+              >RIP WIKI PAGE</a
+            >
+          </li>
+          <li id="autowiki"><a tabindex="0">AUTO WIKI POPUP</a></li>
+          <li id="copy"><a tabindex="0">COPY RIP LINK</a></li>
+          <li id="copyplaylist"><a tabindex="0">GENERATE PLAYLIST</a></li>
+          <li id="dark"><a tabindex="0">LIGHT</a></li>
+          <hr />
+          <li id="sort">
+            <a tabindex="0">ORDER: <span class="sortoption">RANDOM</span></a>
+          </li>
+          <li id="skipduration">
+            <a tabindex="0">SKIP LONG RIPS <span class="checkbox">☒</span></a>
+          </li>
+          <li id="yearfilter">
+            <a tabindex="0"
+              ><span class="year-label">YEAR:</span>
+              <span class="checkbox">ALL</span></a
+            >
+          </li>
+          <li id="skipkfad">
+            <a tabindex="0"><span class="checkbox">☐</span> SKIP KFAD</a>
+          </li>
+          <li id="nowiki">
+            <a tabindex="0"><span class="checkbox">☐</span> NO WIKI ONLY</a>
+          </li>
+          <li id="allowrepeats">
+            <a tabindex="0"><span class="checkbox">☐</span> ALLOW REPEATS</a>
+          </li>
+          <li id="channels">
+            <a tabindex="0">CHANNELS:</a>
+            <a class="percentcomplete" tabindex="0"></a>
+          </li>
+          <li id="siiva">
+            <a tabindex="0"
+              ><span class="checkbox">☑</span>
+              <span class="channel">SIIVA</span></a
+            >
+            <a class="percentcomplete" tabindex="0"></a>
+          </li>
+          <li id="ttgd">
+            <a tabindex="0"
+              ><span class="checkbox">☐</span>
+              <span class="channel">TTGD</span></a
+            >
+            <a class="percentcomplete" tabindex="0"></a>
+          </li>
+          <li id="vavr">
+            <a tabindex="0"
+              ><span class="checkbox">☐</span>
+              <span class="channel">VAVR</span></a
+            >
+            <a class="percentcomplete" tabindex="0"></a>
+          </li>
+          <li id="bootleg">
+            <a tabindex="0"
+              ><span class="checkbox">☐</span>
+              <span class="channel">OTHER</span></a
+            >
+            <a class="percentcomplete" tabindex="0"></a>
+          </li>
+        </ol>
+      </div>
+      <div class="playercontainer">
+        <div class="ripmetadata" tabindex="0">
+          <h2>NOW PLAYING:</h2>
+          <h2 id="nowplaying">&nbsp</h2>
+          <h2 id="author">&nbsp</h2>
+        </div>
+        <div style="display: none" id="timeover"></div>
+        <div class="embedcontainer">
+          <div id="player">Loading...</div>
+        </div>
+        <div id="pastearea">
+          <h4>watch progress string:</h4>
+          <textarea></textarea>
+          <a id="overwrite">OVERWRITE?</a>
+        </div>
+      </div>
+    </div>
+    <h3 id="twitter" style="display: none">
+      <a
+        target="_blank"
+        rel="noopener noreferrer"
+        href="https://twitter.com/brubsby"
+        >follow me on twitter</a
+      >
+      or
+      <a
+        target="_blank"
+        rel="noopener noreferrer"
+        href="https://ko-fi.com/brubsby"
+        >buy me a coffee</a
+      >
+      if you like the page! (<a id="hidetwitter">not today</a> /
+      <a id="permahidetwitter">not ever</a>)
+    </h3>
+    <script src="js/db.js"></script>
+    <script src="js/config.js"></script>
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script
+      async
+      src="https://www.googletagmanager.com/gtag/js?id=UA-152720878-1"
+    ></script>
+    <script src="js/app.js?v=18"></script>
+  </body>
+</html>

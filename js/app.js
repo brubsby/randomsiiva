@@ -205,7 +205,7 @@ class RandomRipPlayer {
         [
           "li#skipduration > a",
           () => this.skipDurationClicked(),
-          "skip rips that are over the specified duration (click to cycle through durations)",
+          "skip rips that are over the specified duration (left or right click to cycle)",
           (e) => {
             e.preventDefault();
             this.skipDurationClicked(-1);
@@ -214,7 +214,7 @@ class RandomRipPlayer {
         [
           "li#yearfilter > a",
           (e) => this.yearFilterClick(e, 1),
-          "view only rips from the selected year",
+          "view only rips from the selected year(s) (left and right click to cycle through years)",
           (e) => {
             e.preventDefault();
             this.yearFilterClick(e, -1);
@@ -223,7 +223,7 @@ class RandomRipPlayer {
         [
           "li#sort > a",
           () => this.sortClicked(),
-          "order rips in various ways (click to cycle through order options)",
+          "order rips in various ways (left or right click to cycle)",
           (e) => {
             e.preventDefault();
             this.sortClicked(-1);
@@ -305,7 +305,7 @@ class RandomRipPlayer {
             }
             if (tooltipMessage) {
               el.onmouseenter = () => this.tooltip(tooltipMessage);
-              el.onmouseout = () => this.tooltip("");
+              el.onmouseleave = () => this.tooltip("");
               el.onfocus = () => this.tooltip(tooltipMessage);
               el.onblur = () => this.tooltip("");
             }
@@ -1198,7 +1198,7 @@ class RandomRipPlayer {
     const s = this.state;
     const anyBootlegActive = Object.values(s.bootleg_channels).some((x) => x);
     const effectiveBootleg = s.channels.bootleg && anyBootlegActive;
-    
+
     if (
       !s.channels.siiva &&
       !s.channels.ttgd &&
