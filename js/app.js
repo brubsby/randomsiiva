@@ -206,16 +206,28 @@ class RandomRipPlayer {
           "li#skipduration > a",
           () => this.skipDurationClicked(),
           "skip rips that are over the specified duration (click to cycle through durations)",
+          (e) => {
+            e.preventDefault();
+            this.skipDurationClicked(-1);
+          },
         ],
         [
           "li#yearfilter > a",
           () => this.yearFilterClicked(),
           "view only rips from the selected year",
+          (e) => {
+            e.preventDefault();
+            this.yearFilterClicked(-1);
+          },
         ],
         [
           "li#sort > a",
           () => this.sortClicked(),
           "order rips in various ways (click to cycle through order options)",
+          (e) => {
+            e.preventDefault();
+            this.sortClicked(-1);
+          },
         ],
         [
           "li#skipkfad > a",
@@ -281,81 +293,28 @@ class RandomRipPlayer {
         ],
       ];
 
-      bindings.forEach(([selector, handler, tooltipMessage]) => {
-        const el = document.querySelector(selector);
-        if (el) {
-          if (handler) {
-            el.onclick = handler;
-            el.onkeydown = (e) => {
-              if (e.code === "Space" || e.code === "Enter") handler();
-            };
+      bindings.forEach(
+        ([selector, handler, tooltipMessage, contextHandler]) => {
+          const el = document.querySelector(selector);
+          if (el) {
+            if (handler) {
+              el.onclick = handler;
+              el.onkeydown = (e) => {
+                if (e.code === "Space" || e.code === "Enter") handler();
+              };
+            }
+            if (tooltipMessage) {
+              el.onmouseenter = () => this.tooltip(tooltipMessage);
+              el.onmouseout = () => this.tooltip("");
+              el.onfocus = () => this.tooltip(tooltipMessage);
+              el.onblur = () => this.tooltip("");
+            }
+            if (contextHandler) {
+              el.oncontextmenu = contextHandler;
+            }
           }
-          if (tooltipMessage) {
-            el.onmouseenter = () => this.tooltip(tooltipMessage);
-            el.onmouseout = () => this.tooltip("");
-            el.onfocus = () => this.tooltip(tooltipMessage);
-            el.onblur = () => this.tooltip("");
-          }
-        }
-      });
-
-      // Special cases for complex tooltips
-      const channelProgress = document.querySelector(
-        "li#channels > a.percentcomplete",
+        },
       );
-      if (channelProgress) {
-        const show = () => this.channelProgressTooltip();
-        const hide = () => this.tooltip("");
-        channelProgress.onmouseover = show;
-        channelProgress.onmouseout = hide;
-        channelProgress.onfocus = show;
-        channelProgress.onblur = hide;
-      }
-
-      const metadata = document.querySelector("div.ripmetadata");
-      if (metadata) {
-        const show = () => this.metadataTooltip();
-        const hide = () => this.tooltip("");
-        metadata.onmouseover = show;
-        metadata.onmouseout = hide;
-        metadata.onfocus = show;
-        metadata.onblur = hide;
-      }
-
-      // Channel percentage tooltips
-      ["siiva", "ttgd", "vavr", "bootleg"].forEach((ch) => {
-        const el = document.querySelector(`li#${ch} > a.percentcomplete`);
-        if (el) {
-          const show = () => this.channelProgressTooltip(ch);
-          const hide = () => this.tooltip("");
-          el.onmouseenter = show;
-          el.onmouseout = hide;
-          el.onfocus = show;
-          el.onblur = hide;
-          el.onclick = () => this.channelProgressClicked(ch);
-          el.onkeydown = (e) => {
-            if (e.code === "Space" || e.code === "Enter")
-              this.channelProgressClicked(ch);
-          };
-        }
-      });
-
-      // Media Session & Keyboard
-      navigator.mediaSession.setActionHandler("nexttrack", () =>
-        this.skipVid(),
-      );
-      navigator.mediaSession.setActionHandler("previoustrack", () =>
-        this.previousVid(),
-      );
-      document.addEventListener("keydown", (e) => this.handleKeydown(e));
-
-      this.makeDraggable(document.getElementById("fanchannelwindow"));
-    });
-
-    window.addEventListener("beforeunload", () => {
-      if (!!this.autoWikiWindow && !this.autoWikiWindow.closed) {
-        this.autoWikiWindow.close();
-      }
     });
   }
 
@@ -1288,9 +1247,10 @@ class RandomRipPlayer {
       `(${pct(s.unwatched.bootleg.length, s.bootleg_vids.length)}% watched)`;
   }
 
-  skipDurationClicked() {
+  skipDurationClicked(dir = 1) {
+    const len = Config.Durations.length;
     this.state.skipDurationIndex =
-      (this.state.skipDurationIndex + 1) % Config.Durations.length;
+      (this.state.skipDurationIndex + dir + len) % len;
     const setting = Config.Durations[this.state.skipDurationIndex];
     document.querySelector("li#skipduration > a > span.checkbox").textContent =
       setting[0];
@@ -1298,9 +1258,10 @@ class RandomRipPlayer {
     this.savePreferences();
   }
 
-  yearFilterClicked() {
+  yearFilterClicked(dir = 1) {
+    const len = this.yearFilterOptions.length;
     this.state.yearFilterIndex =
-      (this.state.yearFilterIndex + 1) % this.yearFilterOptions.length;
+      (this.state.yearFilterIndex + dir + len) % len;
     document.querySelector("li#yearfilter > a > span.checkbox").textContent =
       this.yearFilterOptions[this.state.yearFilterIndex];
     this.state.yearFilterSelected = parseInt(
@@ -1309,8 +1270,9 @@ class RandomRipPlayer {
     this.savePreferences();
   }
 
-  sortClicked() {
-    this.state.sortIndex = (this.state.sortIndex + 1) % this.sortOptions.length;
+  sortClicked(dir = 1) {
+    const len = this.sortOptions.length;
+    this.state.sortIndex = (this.state.sortIndex + dir + len) % len;
     if (this.state.sortIndex < 3) {
       this.state.allowRepeatLock = false;
     } else {
