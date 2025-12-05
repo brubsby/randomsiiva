@@ -115,7 +115,7 @@ class RandomRipPlayer {
           const vid_db = await idbKeyval.get(Config.StorageKeys.VID_DB);
           if (vid_db) {
             this.state.siiva_vids = vid_db[0];
-            this.loadWatchedVids();
+            this.initWatchedVids();
             const unwatched = this.state.unwatched.siiva;
             const randomVid =
               unwatched[Math.floor(unwatched.length * Math.random())][0];
@@ -132,9 +132,11 @@ class RandomRipPlayer {
           if (responseText) {
             try {
               this.state.sheetsJson = JSON.parse(responseText);
-              const vid_db = this.processSheetsJSON(this.state.sheetsJson);
+              this.state.vid_db = this.processSheetsJSON(this.state.sheetsJson);
               const randomVid =
-                vid_db[0][Math.floor(vid_db[0].length * Math.random())][0];
+                this.state.vid_db[0][
+                  Math.floor(this.state.vid_db[0].length * Math.random())
+                ][0];
               window.localStorage.setItem(
                 Config.StorageKeys.RANDOM_VID,
                 randomVid,
@@ -653,6 +655,8 @@ class RandomRipPlayer {
           console.error("Critical: No sheet data");
           return;
         }
+      } else if (!this.state.vid_db) {
+        this.state.vid_db = this.processSheetsJSON(this.state.sheetsJson);
       }
       if (Config.browserHasLocalStorage && this.state.sheetsJson) {
         await idbKeyval.set(Config.StorageKeys.VID_DB, this.state.vid_db);
