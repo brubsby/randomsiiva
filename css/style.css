@@ -317,3 +317,15 @@ hr {
 .fc-item:hover {
   text-decoration: underline;
 }
+
+li#yearfilter > a:hover {
+  text-decoration: none;
+}
+
+li#yearfilter > a > span.checkbox:hover {
+  text-decoration: underline;
+}
+
+li#yearfilter > a > span.year-label:hover {
+  text-decoration: underline;
+}

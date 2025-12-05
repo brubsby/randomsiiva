@@ -213,11 +213,11 @@ class RandomRipPlayer {
         ],
         [
           "li#yearfilter > a",
-          () => this.yearFilterClicked(),
+          (e) => this.yearFilterClick(e, 1),
           "view only rips from the selected year",
           (e) => {
             e.preventDefault();
-            this.yearFilterClicked(-1);
+            this.yearFilterClick(e, -1);
           },
         ],
         [
@@ -1020,7 +1020,12 @@ class RandomRipPlayer {
     if (s.skipDurationIndex !== 0) {
       list = list.filter((v) => v[4] < s.durationOfVidToSkip);
     }
-    if (s.yearFilterIndex !== 0) {
+    if (s.isYearRangeMode) {
+      list = list.filter((v) => {
+        const y = new Date(v[3]).getFullYear();
+        return y >= s.yearRange[0] && y <= s.yearRange[1];
+      });
+    } else if (s.yearFilterIndex !== 0) {
       list = list.filter(
         (v) => new Date(v[3]).getFullYear() == s.yearFilterSelected,
       );
@@ -1258,15 +1263,48 @@ class RandomRipPlayer {
     this.savePreferences();
   }
 
-  yearFilterClicked(dir = 1) {
-    const len = this.yearFilterOptions.length;
-    this.state.yearFilterIndex =
-      (this.state.yearFilterIndex + dir + len) % len;
-    document.querySelector("li#yearfilter > a > span.checkbox").textContent =
-      this.yearFilterOptions[this.state.yearFilterIndex];
-    this.state.yearFilterSelected = parseInt(
-      this.yearFilterOptions[this.state.yearFilterIndex],
-    );
+  renderYearFilter() {
+    const el = document.querySelector("li#yearfilter > a");
+    if (!this.state.isYearRangeMode) {
+      const val = this.yearFilterOptions[this.state.yearFilterIndex];
+      el.innerHTML = `<span class="year-label">YEAR:</span> <span class="checkbox">${val}</span>`;
+    } else {
+      el.innerHTML = `<span class="year-label">YEARS:</span> <span class="checkbox year-start">${this.state.yearRange[0]}</span>-<span class="checkbox year-end">${this.state.yearRange[1]}</span>`;
+    }
+  }
+
+  yearFilterClick(e, dir = 1) {
+    const s = this.state;
+    const currentYear = new Date().getUTCFullYear();
+    if (!s.yearRange) {
+      s.yearRange = [Config.YearFilterStart, currentYear];
+    }
+
+    const cl = e.target.classList;
+    if (cl.contains("year-label")) {
+      s.isYearRangeMode = !s.isYearRangeMode;
+    } else if (!s.isYearRangeMode) {
+      const len = this.yearFilterOptions.length;
+      s.yearFilterIndex = (s.yearFilterIndex + dir + len) % len;
+      s.yearFilterSelected = parseInt(
+        this.yearFilterOptions[s.yearFilterIndex],
+      );
+    } else {
+      if (cl.contains("year-start")) {
+        s.yearRange[0] += dir;
+        if (s.yearRange[0] < Config.YearFilterStart)
+          s.yearRange[0] = Config.YearFilterStart;
+        if (s.yearRange[0] > currentYear) s.yearRange[0] = currentYear;
+        if (s.yearRange[0] > s.yearRange[1]) s.yearRange[1] = s.yearRange[0];
+      } else if (cl.contains("year-end")) {
+        s.yearRange[1] += dir;
+        if (s.yearRange[1] > currentYear) s.yearRange[1] = currentYear;
+        if (s.yearRange[1] < Config.YearFilterStart)
+          s.yearRange[1] = Config.YearFilterStart;
+        if (s.yearRange[1] < s.yearRange[0]) s.yearRange[0] = s.yearRange[1];
+      }
+    }
+    this.renderYearFilter();
     this.savePreferences();
   }
 
@@ -1579,7 +1617,8 @@ class RandomRipPlayer {
         bootleg: s.channels.bootleg,
       },
       skipDurationIndex: s.skipDurationIndex,
-      yearFilterIndex: s.yearFilterIndex,
+      yearRange: s.yearRange,
+      isYearRangeMode: s.isYearRangeMode,
       sortIndex: s.sortIndex,
     };
     window.localStorage.setItem(
@@ -1625,17 +1664,14 @@ class RandomRipPlayer {
         }
       }
 
-      if (prefs.yearFilterIndex !== undefined) {
-        s.yearFilterIndex = prefs.yearFilterIndex;
-        if (s.yearFilterIndex >= this.yearFilterOptions.length)
-          s.yearFilterIndex = 0;
+      if (prefs.yearRange !== undefined) s.yearRange = prefs.yearRange;
+      if (prefs.isYearRangeMode !== undefined)
+        s.isYearRangeMode = prefs.isYearRangeMode;
 
-        s.yearFilterSelected = parseInt(
-          this.yearFilterOptions[s.yearFilterIndex],
-        );
-        document.querySelector("li#yearfilter > a > span.checkbox").textContent =
-          this.yearFilterOptions[s.yearFilterIndex];
+      if (!s.yearRange) {
+        s.yearRange = [Config.YearFilterStart, new Date().getUTCFullYear()];
       }
+      this.renderYearFilter();
 
       if (prefs.sortIndex !== undefined) {
         s.sortIndex = prefs.sortIndex;
