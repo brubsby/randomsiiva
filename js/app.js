@@ -1145,11 +1145,14 @@ class RandomRipPlayer {
           !all;
     }
 
+    const anyBootlegActive = Object.values(s.bootleg_channels).some((x) => x);
+    const effectiveBootleg = s.channels.bootleg && anyBootlegActive;
+
     if (
       !s.channels.siiva &&
       !s.channels.ttgd &&
       !s.channels.vavr &&
-      !s.channels.bootleg
+      !effectiveBootleg
     ) {
       s.channels.siiva = true;
     }
@@ -1197,6 +1200,7 @@ class RandomRipPlayer {
         JSON.stringify(this.state.bootleg_channels),
       );
     }
+    this.checkEmptyPool();
     this.renderFanChannelWindow();
   }
 
@@ -1210,7 +1214,24 @@ class RandomRipPlayer {
         JSON.stringify(this.state.bootleg_channels),
       );
     }
+    this.checkEmptyPool();
     this.renderFanChannelWindow();
+  }
+
+  checkEmptyPool() {
+    const s = this.state;
+    const anyBootlegActive = Object.values(s.bootleg_channels).some((x) => x);
+    const effectiveBootleg = s.channels.bootleg && anyBootlegActive;
+    
+    if (
+      !s.channels.siiva &&
+      !s.channels.ttgd &&
+      !s.channels.vavr &&
+      !effectiveBootleg
+    ) {
+      s.channels.siiva = true;
+      this.updateCheckboxes();
+    }
   }
 
   updateCheckboxes() {
