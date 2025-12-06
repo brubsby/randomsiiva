@@ -47,13 +47,14 @@ class RandomRipPlayer {
 
       vid_db: null,
       bootleg_vid_db: null,
+      startId: new URLSearchParams(window.location.search).get("startId"),
     };
 
     this.player = null;
     this.autoWikiWindow = null;
     this.firstVidPromise = null;
     this.currentExportChannel = null;
-    this.worker = new Worker("js/worker.js?v=20");
+    this.worker = new Worker("js/worker.js?v=21");
     this.workerCallbacks = {};
     this.sheetsReadyPromise = null;
     this.dataLoadingInitialized = false;
@@ -130,6 +131,10 @@ class RandomRipPlayer {
   }
 
   setupFirstVidPromise() {
+    if (this.state.startId) {
+      this.firstVidPromise = Promise.resolve(this.state.startId);
+      return;
+    }
     this.firstVidPromise = window.localStorage.getItem(
       Config.StorageKeys.RANDOM_VID,
     );
@@ -499,12 +504,17 @@ class RandomRipPlayer {
       this.othersReadyPromise,
       this.bootlegReadyPromise,
     ]).then(() => {
-      this.initWatchedVids();
-      window.localStorage.setItem(
-        Config.StorageKeys.RANDOM_VID,
-        this.getRandomUnwatchedSiivaVid(),
-      );
-      this.state.sheetsChecked = true;
+      if (this.state.startId) {
+        this.populateSequentialHistory();
+        this.state.sheetsChecked = true;
+      } else {
+        this.initWatchedVids();
+        window.localStorage.setItem(
+          Config.StorageKeys.RANDOM_VID,
+          this.getRandomUnwatchedSiivaVid(),
+        );
+        this.state.sheetsChecked = true;
+      }
     });
   }
 
@@ -920,7 +930,9 @@ class RandomRipPlayer {
   }
 
   initWatchedVids() {
-    if (
+    if (this.state.startId) {
+      this.state.watchedVidIds = [];
+    } else if (
       Config.browserHasLocalStorage &&
       window.localStorage.getItem(Config.StorageKeys.WATCHED_VID_IDS)
     ) {
@@ -1012,10 +1024,12 @@ class RandomRipPlayer {
   markVidWatched(id) {
     if (!this.state.watchedVidIds.includes(id)) {
       this.state.watchedVidIds.push(id);
-      window.localStorage.setItem(
-        Config.StorageKeys.WATCHED_VID_IDS,
-        JSON.stringify(this.state.watchedVidIds),
-      );
+      if (!this.state.startId) {
+        window.localStorage.setItem(
+          Config.StorageKeys.WATCHED_VID_IDS,
+          JSON.stringify(this.state.watchedVidIds),
+        );
+      }
 
       const notVidFilter = (x) => x[0] !== id;
       this.state.unwatched.siiva =
@@ -1028,6 +1042,24 @@ class RandomRipPlayer {
         this.state.unwatched.bootleg.filter(notVidFilter);
       this.updateWatchPercentages();
     }
+  }
+
+  populateSequentialHistory() {
+    const allVids = [
+      ...this.state.siiva_vids,
+      ...this.state.ttgd_vids,
+      ...this.state.vavr_vids,
+      ...this.state.bootleg_vids,
+    ];
+    const startVid = allVids.find((v) => v[0] === this.state.startId);
+    if (startVid) {
+      const startTime = startVid[3];
+      const pastVids = allVids.filter((v) => v[3] < startTime).map((v) => v[0]);
+      this.state.watchedVidIds = pastVids;
+    } else {
+      console.warn("Start ID not found in DB:", this.state.startId);
+    }
+    this.initUnwatched();
   }
 
   getRandomUnwatchedSiivaVid() {
@@ -1750,6 +1782,29 @@ class RandomRipPlayer {
       this.updateCheckboxes();
       if (s.channels.bootleg) {
         this.toggleFanChannelWindow(true);
+      }
+
+      if (this.state.startId) {
+        // Force OLDEST sort
+        const oldestIndex = this.sortOptions.findIndex((o) => o[0] === "OLDEST");
+        if (oldestIndex !== -1) {
+          s.sortIndex = oldestIndex;
+          s.sortOption = "OLDEST";
+          document.querySelector("li#sort > a > span.sortoption").textContent =
+            s.sortOption;
+        }
+        
+        // Force No Repeats
+        s.allowRepeatLock = true;
+        s.allowRepeats = false;
+
+        // Force Year Filter to ALL
+        s.isYearRangeMode = false;
+        s.yearFilterIndex = 0;
+        s.yearFilterSelected = Number.NaN;
+        this.renderYearFilter();
+
+        this.updateCheckboxes();
       }
     } catch (e) {
       console.error("Failed to load preferences", e);
