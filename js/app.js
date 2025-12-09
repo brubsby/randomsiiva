@@ -302,6 +302,26 @@ class RandomRipPlayer {
           "",
         ],
         [
+          "li#siiva > a.percentcomplete",
+          () => this.channelProgressClicked("siiva"),
+          "",
+        ],
+        [
+          "li#ttgd > a.percentcomplete",
+          () => this.channelProgressClicked("ttgd"),
+          "",
+        ],
+        [
+          "li#vavr > a.percentcomplete",
+          () => this.channelProgressClicked("vavr"),
+          "",
+        ],
+        [
+          "li#bootleg > a.percentcomplete",
+          () => this.channelProgressClicked("bootleg"),
+          "",
+        ],
+        [
           "a#overwrite",
           () => this.overWriteClicked(),
           "save this string to export your watch history, or paste an exported one here, and click OVERWRITE to import (a blank string clears your watch history)",
