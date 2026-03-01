@@ -1,6 +1,7 @@
 class RandomRipPlayer {
   constructor() {
     this.state = {
+      nextVidId: null,
       currentVidId: null,
       history: [],
       currentVidTitle: null,
@@ -538,6 +539,42 @@ class RandomRipPlayer {
     });
   }
 
+  // Handle updating the fake playlist that we feed the YouTube player API.
+  onSongTransition(newIndex){
+    const isTransitionForward = newIndex === 2 || (newIndex === 1 && !this.state.previousVidId);
+    if (isTransitionForward) {
+      this.markVidWatched(this.state.currentVidId);
+      this.state.previousVidId = this.state.currentVidId;
+      if (this.state.nextVidId) {
+        this.state.currentVidId = this.state.nextVidId; // TODO: doesn't account for setting changes between videos
+      } else {
+        this.state.currentVidId = this.getNextVidId();
+        this.player?.stopVideo(); // neccessary to overwrite the current video
+      }
+      window.localStorage.setItem(Config.StorageKeys.RANDOM_VID, this.getRandomUnwatchedSiivaVid());
+      this.state.previousChannel = this.state.currentChannel;
+      this.state.isPreviousVidKFAD = this.state.isCurrentVidKFAD;
+      this.state.isInfoReady = false;
+      
+      var newIds = [];
+      newIds.push(this.state.previousVidId);
+      newIds.push(this.state.currentVidId);
+      this.state.nextVidId = this.getNextVidId();
+      newIds.push(this.state.nextVidId);
+      this.player?.loadPlaylist(newIds, 1);
+    } else if (newIndex === 0 && this.state.previousVidId) {
+      // transition backwards
+      this.state.nextVidId = this.state.currentVidId;
+      this.state.currentVidId = this.state.previousVidId;
+      this.state.previousVidId = null;
+      this.state.isInfoReady = false;
+    }
+  }
+
+  getInitialPlaylist() {
+    return [this.state.currentVidId, "7VcYz6KZtqs"].join(',');
+  }
+
   onPlayerReady() {
     this.updateTitleMaxWidth();
     this.onTitleReady();
@@ -547,15 +584,18 @@ class RandomRipPlayer {
   }
 
   onPlayerStateChange(event) {
-    if (event.data == YT.PlayerState.ENDED) {
+    if (event.data == YT.PlayerState.UNSTARTED || event.data == YT.PlayerState.ENDED) { // fires during playlist transitions
       this.clearTimeOver();
-      if (this.state.isAutoplay) {
-        this.newVid(true);
+      var newIndex = this.player.getPlaylistIndex(); // should always be 0 (skip back), 1 (second video after initial load), or 2 (skip forward)
+      if (!autoplay && event.data == YT.PlayerState.UNSTARTED) { // todo: going backwards triggers this too
+        this.player.pauseVideo(); // don't play more if autoplay is off
+        return;
       }
-    } else if (
-      event.data == YT.PlayerState.PLAYING &&
-      !this.state.isInfoReady
-    ) {
+      if (!autoplay && event.data == YT.PlayerState.ENDED) {
+        return;
+      }
+      this.onSongTransition(newIndex);
+    } else if (event.data == YT.PlayerState.PLAYING && !this.state.isInfoReady) {
       this.onTitleReady();
     }
     if (event.data == YT.PlayerState.PLAYING) {
@@ -647,28 +687,7 @@ class RandomRipPlayer {
     document.querySelector("h2#nowplaying").textContent =
       this.state.currentVidTitle;
     document.title = this.state.currentVidTitle + " - Random Rip Player";
-    this.updateMediaSession();
     document.querySelector("h2#author").textContent = this.state.currentChannel;
-  }
-
-  updateMediaSession() {
-    if ("mediaSession" in navigator) {
-      navigator.mediaSession.metadata = new MediaMetadata({
-        title: this.state.currentVidTitle.match(/^.*?((?=\s[-|]\s)|$)/g),
-        artist: this.state.currentChannel,
-        album: this.state.currentVidTitle.match(/(?<=\s[-|]\s).*$/g),
-        artwork: [
-          {
-            src:
-              "https://img.youtube.com/vi/" +
-              this.state.currentVidId +
-              "/0.jpg",
-            sizes: "480x360",
-            type: "image/jpg",
-          },
-        ],
-      });
-    }
   }
 
   updateTitleMaxWidth() {
@@ -986,10 +1005,8 @@ class RandomRipPlayer {
   }
   previousVid() {
     if (this.state.history.length > 0) {
-      this.state.currentVidId = this.state.history.pop();
       this.state.isInfoReady = false;
-      this.player.loadVideoById(this.state.currentVidId);
-      this.player.playVideo();
+      this.player.previousVideo();
     }
   }
 
@@ -1031,14 +1048,12 @@ class RandomRipPlayer {
     if (this.state.currentVidId) {
       this.state.history.push(this.state.currentVidId);
     }
-    this.state.currentVidId = this.nextVidId();
     window.localStorage.setItem(
       Config.StorageKeys.RANDOM_VID,
       this.getRandomUnwatchedSiivaVid(),
     );
     this.state.isInfoReady = false;
-    this.player.loadVideoById(this.state.currentVidId);
-    this.player.playVideo();
+    this.player?.nextVideo(); // TODO: don't think this is enough if autoplay is off?
   }
 
   markVidWatched(id) {
@@ -1089,7 +1104,7 @@ class RandomRipPlayer {
       : "rEcOzjg7vBU";
   }
 
-  nextVidId() {
+  getNextVidId() {
     const ids = this.getVidIds(1);
     return ids[0] || "h6Ja9JyXs-I";
   }
@@ -1865,6 +1880,8 @@ window.onYouTubeIframeAPIReady = async () => {
     width: container.offsetWidth,
     videoId: vidId,
     playerVars: {
+      playlist: app.getInitialPlaylist(),
+      index: 0,
       autoplay: 1,
       enablejsapi: 1,
       disablekb: 0,
