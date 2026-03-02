@@ -1,8 +1,11 @@
 class RandomRipPlayer {
   constructor() {
     this.state = {
+      nextVidId: null,
       currentVidId: null,
       history: [],
+      playlistTimeline: [], // distinct from history because it lets you go back without losing the "future"
+      playlistIndex: 0,
       currentVidTitle: null,
       isCurrentVidKFAD: false,
       previousChannel: null,
@@ -58,6 +61,9 @@ class RandomRipPlayer {
     this.workerCallbacks = {};
     this.sheetsReadyPromise = null;
     this.dataLoadingInitialized = false;
+    this.playlistReady = false;
+    this.suppressNextUnstarted = false;
+    this.markOnNextForwardTransition = true;
 
     this.worker.onmessage = (e) => {
       const { id, result, error, success } = e.data;
@@ -535,10 +541,160 @@ class RandomRipPlayer {
         );
         this.state.sheetsChecked = true;
       }
+      this.syncPlaylistWindow({ preserveTime: true });
     });
   }
 
+  ensurePlaylistTimeline() {
+    if (!this.state.currentVidId) return;
+
+    if (!this.state.playlistTimeline.length) {
+      const seededTimeline = this.state.history.concat([this.state.currentVidId]);
+      this.state.playlistTimeline = seededTimeline;
+      this.state.playlistIndex = this.state.playlistTimeline.length - 1;
+      return;
+    }
+
+    const currentTimelineVid =
+      this.state.playlistTimeline[this.state.playlistIndex];
+    if (currentTimelineVid === this.state.currentVidId) return;
+
+    const existingIndex = this.state.playlistTimeline.lastIndexOf(
+      this.state.currentVidId,
+    );
+    if (existingIndex !== -1) {
+      this.state.playlistIndex = existingIndex;
+      return;
+    }
+
+    this.state.playlistTimeline.push(this.state.currentVidId);
+    this.state.playlistIndex = this.state.playlistTimeline.length - 1;
+  }
+
+  getPlaylistNextVidId() {
+    this.ensurePlaylistTimeline();
+
+    if (this.state.playlistIndex < this.state.playlistTimeline.length - 1) {
+      const existingNext =
+        this.state.playlistTimeline[this.state.playlistIndex + 1];
+      this.state.nextVidId = existingNext;
+      return existingNext;
+    }
+
+    if (!this.state.sheetsChecked) {
+      this.state.nextVidId = this.state.currentVidId;
+      return this.state.nextVidId;
+    }
+
+    this.state.nextVidId = this.getNextVidId();
+    return this.state.nextVidId;
+  }
+
+  getPlaylistWindowIds() {
+    this.ensurePlaylistTimeline();
+
+    const timeline = this.state.playlistTimeline;
+    const idx = this.state.playlistIndex;
+    const prevId = idx > 0 ? timeline[idx - 1] : this.state.currentVidId;
+    const nextId = this.getPlaylistNextVidId();
+
+    return [prevId, this.state.currentVidId, nextId];
+  }
+
+  disablePlaylistMode({ preserveTime = false } = {}) {
+    if (!this.playlistReady) return;
+    if (!this.player || !this.state.currentVidId) {
+      this.playlistReady = false;
+      this.suppressNextUnstarted = false;
+      return;
+    }
+
+    const wasPlaying =
+      this.player.getPlayerState() === YT.PlayerState.PLAYING ||
+      this.player.getPlayerState() === YT.PlayerState.BUFFERING;
+    const startTime = preserveTime ? this.player.getCurrentTime() : 0;
+
+    this.playlistReady = false;
+    this.suppressNextUnstarted = false;
+    this.player.loadVideoById(this.state.currentVidId, startTime);
+
+    if (!wasPlaying) {
+      this.player.pauseVideo();
+    }
+  }
+
+  syncPlaylistWindow({ preserveTime = false } = {}) {
+    if (!this.player || !this.state.currentVidId || !this.state.sheetsChecked)
+      return;
+
+    if (!this.state.isAutoplay) {
+      this.disablePlaylistMode({ preserveTime });
+      return;
+    }
+
+    const wasPlaying =
+      this.player.getPlayerState() === YT.PlayerState.PLAYING ||
+      this.player.getPlayerState() === YT.PlayerState.BUFFERING;
+    const startTime = preserveTime ? this.player.getCurrentTime() : 0;
+    const ids = this.getPlaylistWindowIds();
+
+    this.suppressNextUnstarted = true;
+    this.player.loadPlaylist(ids, 1, startTime);
+    this.playlistReady = true;
+
+    if (!wasPlaying) {
+      this.player.pauseVideo();
+    }
+  }
+
+  // Handle updating the fake playlist that we feed the YouTube player API.
+  onSongTransition(newIndex) {
+    this.ensurePlaylistTimeline();
+
+    if (newIndex === 2) {
+      const leavingVidId = this.state.currentVidId;
+      if (this.markOnNextForwardTransition) {
+        this.markVidWatched(leavingVidId);
+      }
+      this.markOnNextForwardTransition = true;
+
+      if (this.state.playlistIndex < this.state.playlistTimeline.length - 1) {
+        this.state.playlistIndex += 1;
+        this.state.currentVidId =
+          this.state.playlistTimeline[this.state.playlistIndex];
+      } else {
+        const fallbackNextId = "h6Ja9JyXs-I";
+        let nextId = this.state.nextVidId;
+        if (
+          !nextId ||
+          nextId === this.state.currentVidId ||
+          (nextId === fallbackNextId && this.state.sheetsChecked)
+        ) {
+          nextId = this.getNextVidId();
+        }
+        this.state.playlistTimeline.push(nextId);
+        this.state.playlistIndex = this.state.playlistTimeline.length - 1;
+        this.state.currentVidId = nextId;
+      }
+
+      window.localStorage.setItem(
+        Config.StorageKeys.RANDOM_VID,
+        this.getRandomUnwatchedSiivaVid(),
+      );
+      this.state.previousChannel = this.state.currentChannel;
+      this.state.isPreviousVidKFAD = this.state.isCurrentVidKFAD;
+      this.state.isInfoReady = false;
+      this.syncPlaylistWindow();
+    } else if (newIndex === 0 && this.state.playlistIndex > 0) {
+      this.state.playlistIndex -= 1;
+      this.state.currentVidId = this.state.playlistTimeline[this.state.playlistIndex];
+      this.state.isInfoReady = false;
+      this.syncPlaylistWindow();
+    }
+  }
+
   onPlayerReady() {
+    this.ensurePlaylistTimeline();
     this.updateTitleMaxWidth();
     this.onTitleReady();
     if (!this.state.sheetsChecked) {
@@ -547,15 +703,20 @@ class RandomRipPlayer {
   }
 
   onPlayerStateChange(event) {
-    if (event.data == YT.PlayerState.ENDED) {
-      this.clearTimeOver();
-      if (this.state.isAutoplay) {
-        this.newVid(true);
+    if (event.data == YT.PlayerState.UNSTARTED) {
+      if (!this.playlistReady) return;
+
+      if (this.suppressNextUnstarted) {
+        this.suppressNextUnstarted = false;
+        return;
       }
-    } else if (
-      event.data == YT.PlayerState.PLAYING &&
-      !this.state.isInfoReady
-    ) {
+
+      const newIndex = this.player.getPlaylistIndex();
+      this.clearTimeOver();
+      if (newIndex === 0 || newIndex === 2) {
+        this.onSongTransition(newIndex);
+      }
+    } else if (event.data == YT.PlayerState.PLAYING && !this.state.isInfoReady) {
       this.onTitleReady();
     }
     if (event.data == YT.PlayerState.PLAYING) {
@@ -647,28 +808,7 @@ class RandomRipPlayer {
     document.querySelector("h2#nowplaying").textContent =
       this.state.currentVidTitle;
     document.title = this.state.currentVidTitle + " - Random Rip Player";
-    this.updateMediaSession();
     document.querySelector("h2#author").textContent = this.state.currentChannel;
-  }
-
-  updateMediaSession() {
-    if ("mediaSession" in navigator) {
-      navigator.mediaSession.metadata = new MediaMetadata({
-        title: this.state.currentVidTitle.match(/^.*?((?=\s[-|]\s)|$)/g),
-        artist: this.state.currentChannel,
-        album: this.state.currentVidTitle.match(/(?<=\s[-|]\s).*$/g),
-        artwork: [
-          {
-            src:
-              "https://img.youtube.com/vi/" +
-              this.state.currentVidId +
-              "/0.jpg",
-            sizes: "480x360",
-            type: "image/jpg",
-          },
-        ],
-      });
-    }
   }
 
   updateTitleMaxWidth() {
@@ -985,11 +1125,14 @@ class RandomRipPlayer {
     this.newVid(true);
   }
   previousVid() {
-    if (this.state.history.length > 0) {
+    if (this.playlistReady && this.state.playlistIndex > 0) {
+      this.state.isInfoReady = false;
+      this.player.previousVideo();
+    } else if (this.state.history.length > 0) {
       this.state.currentVidId = this.state.history.pop();
       this.state.isInfoReady = false;
-      this.player.loadVideoById(this.state.currentVidId);
-      this.player.playVideo();
+      this.player?.loadVideoById(this.state.currentVidId);
+      this.player?.playVideo();
     }
   }
 
@@ -1027,18 +1170,33 @@ class RandomRipPlayer {
       this.initWatchedVids();
     }
 
-    if (markWatched) this.markVidWatched(this.state.currentVidId);
-    if (this.state.currentVidId) {
-      this.state.history.push(this.state.currentVidId);
+    if (!this.playlistReady && this.state.sheetsChecked) {
+      this.syncPlaylistWindow({ preserveTime: true });
     }
-    this.state.currentVidId = this.nextVidId();
+
+    if (!this.playlistReady) {
+      if (markWatched) this.markVidWatched(this.state.currentVidId);
+      if (this.state.currentVidId) {
+        this.state.history.push(this.state.currentVidId);
+      }
+      this.state.currentVidId = this.getNextVidId();
+      window.localStorage.setItem(
+        Config.StorageKeys.RANDOM_VID,
+        this.getRandomUnwatchedSiivaVid(),
+      );
+      this.state.isInfoReady = false;
+      this.player?.loadVideoById(this.state.currentVidId);
+      this.player?.playVideo();
+      return;
+    }
+
+    this.markOnNextForwardTransition = !!markWatched;
     window.localStorage.setItem(
       Config.StorageKeys.RANDOM_VID,
       this.getRandomUnwatchedSiivaVid(),
     );
     this.state.isInfoReady = false;
-    this.player.loadVideoById(this.state.currentVidId);
-    this.player.playVideo();
+    this.player?.nextVideo();
   }
 
   markVidWatched(id) {
@@ -1089,7 +1247,7 @@ class RandomRipPlayer {
       : "rEcOzjg7vBU";
   }
 
-  nextVidId() {
+  getNextVidId() {
     const ids = this.getVidIds(1);
     return ids[0] || "h6Ja9JyXs-I";
   }
@@ -1169,6 +1327,9 @@ class RandomRipPlayer {
 
   toggleAutoplay() {
     this.state.isAutoplay = !this.state.isAutoplay;
+    if (!this.state.isAutoplay) {
+      this.disablePlaylistMode({ preserveTime: true });
+    }
     if (
       this.state.isAutoplay &&
       this.player &&
@@ -1281,6 +1442,7 @@ class RandomRipPlayer {
     }
     this.checkEmptyPool();
     this.renderFanChannelWindow();
+    this.syncPlaylistWindow({ preserveTime: true });
   }
 
   toggleAllBootlegChannels(enable) {
@@ -1295,6 +1457,7 @@ class RandomRipPlayer {
     }
     this.checkEmptyPool();
     this.renderFanChannelWindow();
+    this.syncPlaylistWindow({ preserveTime: true });
   }
 
   checkEmptyPool() {
@@ -1669,6 +1832,7 @@ class RandomRipPlayer {
           messageSuffix = `${channelDisplayName.toUpperCase()} WATCHED VIDS...`;
         }
         btn.textContent = `LOADED ${loadedCount} ${messageSuffix}`;
+        this.syncPlaylistWindow({ preserveTime: true });
       }, 0);
     } else {
       btn.textContent = "OVERWRITE?";
@@ -1706,7 +1870,6 @@ class RandomRipPlayer {
   }
 
   savePreferences() {
-    if (!Config.browserHasLocalStorage) return;
     const s = this.state;
     const prefs = {
       isAutoplay: s.isAutoplay,
@@ -1725,10 +1888,13 @@ class RandomRipPlayer {
       yearFilterIndex: s.yearFilterIndex,
       sortIndex: s.sortIndex,
     };
-    window.localStorage.setItem(
-      Config.StorageKeys.USER_PREFERENCES,
-      JSON.stringify(prefs),
-    );
+    if (Config.browserHasLocalStorage) {
+      window.localStorage.setItem(
+        Config.StorageKeys.USER_PREFERENCES,
+        JSON.stringify(prefs),
+      );
+    }
+    this.syncPlaylistWindow({ preserveTime: true });
   }
 
   loadPreferences() {
