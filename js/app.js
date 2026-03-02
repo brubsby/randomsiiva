@@ -4,6 +4,8 @@ class RandomRipPlayer {
       nextVidId: null,
       currentVidId: null,
       history: [],
+      playlistTimeline: [],
+      playlistIndex: 0,
       currentVidTitle: null,
       isCurrentVidKFAD: false,
       previousChannel: null,
@@ -59,6 +61,10 @@ class RandomRipPlayer {
     this.workerCallbacks = {};
     this.sheetsReadyPromise = null;
     this.dataLoadingInitialized = false;
+    this.playlistReady = false;
+    this.suppressNextUnstarted = false;
+    this.markOnNextForwardTransition = true;
+    this.lastEndedAt = 0;
 
     this.worker.onmessage = (e) => {
       const { id, result, error, success } = e.data;
@@ -536,46 +542,152 @@ class RandomRipPlayer {
         );
         this.state.sheetsChecked = true;
       }
+      this.syncPlaylistWindow({ preserveTime: true });
     });
   }
 
-  // Handle updating the fake playlist that we feed the YouTube player API.
-  onSongTransition(newIndex){
-    const isTransitionForward = newIndex === 2 || (newIndex === 1 && !this.state.previousVidId);
-    if (isTransitionForward) {
-      this.markVidWatched(this.state.currentVidId);
-      this.state.previousVidId = this.state.currentVidId;
-      if (this.state.nextVidId) {
-        this.state.currentVidId = this.state.nextVidId; // TODO: doesn't account for setting changes between videos
-      } else {
-        this.state.currentVidId = this.getNextVidId();
-        this.player?.stopVideo(); // neccessary to overwrite the current video
+  ensurePlaylistTimeline() {
+    if (!this.state.currentVidId) return;
+
+    if (!this.state.playlistTimeline.length) {
+      const seededTimeline = this.state.history.concat([this.state.currentVidId]);
+      this.state.playlistTimeline = seededTimeline;
+      this.state.playlistIndex = this.state.playlistTimeline.length - 1;
+      return;
+    }
+
+    const currentTimelineVid =
+      this.state.playlistTimeline[this.state.playlistIndex];
+    if (currentTimelineVid === this.state.currentVidId) return;
+
+    const existingIndex = this.state.playlistTimeline.lastIndexOf(
+      this.state.currentVidId,
+    );
+    if (existingIndex !== -1) {
+      this.state.playlistIndex = existingIndex;
+      return;
+    }
+
+    this.state.playlistTimeline.push(this.state.currentVidId);
+    this.state.playlistIndex = this.state.playlistTimeline.length - 1;
+  }
+
+  getPlaylistNextVidId() {
+    this.ensurePlaylistTimeline();
+    const fallbackNextId = "h6Ja9JyXs-I";
+    const cachedRandomVid = Config.browserHasLocalStorage
+      ? window.localStorage.getItem(Config.StorageKeys.RANDOM_VID)
+      : null;
+
+    if (this.state.playlistIndex < this.state.playlistTimeline.length - 1) {
+      const existingNext =
+        this.state.playlistTimeline[this.state.playlistIndex + 1];
+      this.state.nextVidId = existingNext;
+      return existingNext;
+    }
+
+    if (!this.state.sheetsChecked) {
+      if (cachedRandomVid && cachedRandomVid !== this.state.currentVidId) {
+        this.state.nextVidId = cachedRandomVid;
+        return cachedRandomVid;
       }
-      window.localStorage.setItem(Config.StorageKeys.RANDOM_VID, this.getRandomUnwatchedSiivaVid());
-      this.state.previousChannel = this.state.currentChannel;
-      this.state.isPreviousVidKFAD = this.state.isCurrentVidKFAD;
-      this.state.isInfoReady = false;
-      
-      var newIds = [];
-      newIds.push(this.state.previousVidId);
-      newIds.push(this.state.currentVidId);
-      this.state.nextVidId = this.getNextVidId();
-      newIds.push(this.state.nextVidId);
-      this.player?.loadPlaylist(newIds, 1);
-    } else if (newIndex === 0 && this.state.previousVidId) {
-      // transition backwards
+
       this.state.nextVidId = this.state.currentVidId;
-      this.state.currentVidId = this.state.previousVidId;
-      this.state.previousVidId = null;
-      this.state.isInfoReady = false;
+      return this.state.nextVidId;
+    }
+
+    const computedNext = this.getNextVidId();
+    if (
+      computedNext === fallbackNextId &&
+      cachedRandomVid &&
+      cachedRandomVid !== this.state.currentVidId
+    ) {
+      this.state.nextVidId = cachedRandomVid;
+      return cachedRandomVid;
+    }
+
+    this.state.nextVidId = computedNext;
+    return this.state.nextVidId;
+  }
+
+  getPlaylistWindowIds() {
+    this.ensurePlaylistTimeline();
+
+    const timeline = this.state.playlistTimeline;
+    const idx = this.state.playlistIndex;
+    const prevId = idx > 0 ? timeline[idx - 1] : this.state.currentVidId;
+    const nextId = this.getPlaylistNextVidId();
+
+    return [prevId, this.state.currentVidId, nextId];
+  }
+
+  syncPlaylistWindow({ preserveTime = false } = {}) {
+    if (!this.player || !this.state.currentVidId || !this.state.sheetsChecked)
+      return;
+
+    const wasPlaying =
+      this.player.getPlayerState() === YT.PlayerState.PLAYING ||
+      this.player.getPlayerState() === YT.PlayerState.BUFFERING;
+    const startTime = preserveTime ? this.player.getCurrentTime() : 0;
+    const ids = this.getPlaylistWindowIds();
+
+    this.suppressNextUnstarted = true;
+    this.player.loadPlaylist(ids, 1, startTime);
+    this.playlistReady = true;
+
+    if (!wasPlaying) {
+      this.player.pauseVideo();
     }
   }
 
-  getInitialPlaylist() {
-    return [this.state.currentVidId, "7VcYz6KZtqs"].join(',');
+  // Handle updating the fake playlist that we feed the YouTube player API.
+  onSongTransition(newIndex) {
+    this.ensurePlaylistTimeline();
+
+    if (newIndex === 2) {
+      const leavingVidId = this.state.currentVidId;
+      if (this.markOnNextForwardTransition) {
+        this.markVidWatched(leavingVidId);
+      }
+      this.markOnNextForwardTransition = true;
+
+      if (this.state.playlistIndex < this.state.playlistTimeline.length - 1) {
+        this.state.playlistIndex += 1;
+        this.state.currentVidId =
+          this.state.playlistTimeline[this.state.playlistIndex];
+      } else {
+        const fallbackNextId = "h6Ja9JyXs-I";
+        let nextId = this.state.nextVidId;
+        if (
+          !nextId ||
+          nextId === this.state.currentVidId ||
+          (nextId === fallbackNextId && this.state.sheetsChecked)
+        ) {
+          nextId = this.getNextVidId();
+        }
+        this.state.playlistTimeline.push(nextId);
+        this.state.playlistIndex = this.state.playlistTimeline.length - 1;
+        this.state.currentVidId = nextId;
+      }
+
+      window.localStorage.setItem(
+        Config.StorageKeys.RANDOM_VID,
+        this.getRandomUnwatchedSiivaVid(),
+      );
+      this.state.previousChannel = this.state.currentChannel;
+      this.state.isPreviousVidKFAD = this.state.isCurrentVidKFAD;
+      this.state.isInfoReady = false;
+      this.syncPlaylistWindow();
+    } else if (newIndex === 0 && this.state.playlistIndex > 0) {
+      this.state.playlistIndex -= 1;
+      this.state.currentVidId = this.state.playlistTimeline[this.state.playlistIndex];
+      this.state.isInfoReady = false;
+      this.syncPlaylistWindow();
+    }
   }
 
   onPlayerReady() {
+    this.ensurePlaylistTimeline();
     this.updateTitleMaxWidth();
     this.onTitleReady();
     if (!this.state.sheetsChecked) {
@@ -584,17 +696,29 @@ class RandomRipPlayer {
   }
 
   onPlayerStateChange(event) {
-    if (event.data == YT.PlayerState.UNSTARTED || event.data == YT.PlayerState.ENDED) { // fires during playlist transitions
+    if (event.data == YT.PlayerState.UNSTARTED) {
+      if (!this.playlistReady) return;
+
+      if (this.suppressNextUnstarted) {
+        this.suppressNextUnstarted = false;
+        return;
+      }
+
+      const newIndex = this.player.getPlaylistIndex();
+      const endedJustNow = Date.now() - this.lastEndedAt < 2000;
+      if (!this.state.isAutoplay && newIndex === 2 && endedJustNow) {
+        this.lastEndedAt = 0;
+        this.syncPlaylistWindow();
+        return;
+      }
+
+      this.lastEndedAt = 0;
       this.clearTimeOver();
-      var newIndex = this.player.getPlaylistIndex(); // should always be 0 (skip back), 1 (second video after initial load), or 2 (skip forward)
-      if (!autoplay && event.data == YT.PlayerState.UNSTARTED) { // todo: going backwards triggers this too
-        this.player.pauseVideo(); // don't play more if autoplay is off
-        return;
+      if (newIndex === 0 || newIndex === 2) {
+        this.onSongTransition(newIndex);
       }
-      if (!autoplay && event.data == YT.PlayerState.ENDED) {
-        return;
-      }
-      this.onSongTransition(newIndex);
+    } else if (event.data == YT.PlayerState.ENDED) {
+      this.lastEndedAt = Date.now();
     } else if (event.data == YT.PlayerState.PLAYING && !this.state.isInfoReady) {
       this.onTitleReady();
     }
@@ -1004,9 +1128,14 @@ class RandomRipPlayer {
     this.newVid(true);
   }
   previousVid() {
-    if (this.state.history.length > 0) {
+    if (this.playlistReady && this.state.playlistIndex > 0) {
       this.state.isInfoReady = false;
       this.player.previousVideo();
+    } else if (this.state.history.length > 0) {
+      this.state.currentVidId = this.state.history.pop();
+      this.state.isInfoReady = false;
+      this.player?.loadVideoById(this.state.currentVidId);
+      this.player?.playVideo();
     }
   }
 
@@ -1044,16 +1173,34 @@ class RandomRipPlayer {
       this.initWatchedVids();
     }
 
-    if (markWatched) this.markVidWatched(this.state.currentVidId);
-    if (this.state.currentVidId) {
-      this.state.history.push(this.state.currentVidId);
+    if (!this.playlistReady && this.state.sheetsChecked) {
+      this.syncPlaylistWindow({ preserveTime: true });
     }
+
+    if (!this.playlistReady) {
+      if (markWatched) this.markVidWatched(this.state.currentVidId);
+      if (this.state.currentVidId) {
+        this.state.history.push(this.state.currentVidId);
+      }
+      this.state.currentVidId = this.getNextVidId();
+      window.localStorage.setItem(
+        Config.StorageKeys.RANDOM_VID,
+        this.getRandomUnwatchedSiivaVid(),
+      );
+      this.state.isInfoReady = false;
+      this.player?.loadVideoById(this.state.currentVidId);
+      this.player?.playVideo();
+      return;
+    }
+
+    this.markOnNextForwardTransition = !!markWatched;
+    this.lastEndedAt = 0;
     window.localStorage.setItem(
       Config.StorageKeys.RANDOM_VID,
       this.getRandomUnwatchedSiivaVid(),
     );
     this.state.isInfoReady = false;
-    this.player?.nextVideo(); // TODO: don't think this is enough if autoplay is off?
+    this.player?.nextVideo();
   }
 
   markVidWatched(id) {
@@ -1296,6 +1443,7 @@ class RandomRipPlayer {
     }
     this.checkEmptyPool();
     this.renderFanChannelWindow();
+    this.syncPlaylistWindow({ preserveTime: true });
   }
 
   toggleAllBootlegChannels(enable) {
@@ -1310,6 +1458,7 @@ class RandomRipPlayer {
     }
     this.checkEmptyPool();
     this.renderFanChannelWindow();
+    this.syncPlaylistWindow({ preserveTime: true });
   }
 
   checkEmptyPool() {
@@ -1684,6 +1833,7 @@ class RandomRipPlayer {
           messageSuffix = `${channelDisplayName.toUpperCase()} WATCHED VIDS...`;
         }
         btn.textContent = `LOADED ${loadedCount} ${messageSuffix}`;
+        this.syncPlaylistWindow({ preserveTime: true });
       }, 0);
     } else {
       btn.textContent = "OVERWRITE?";
@@ -1721,7 +1871,6 @@ class RandomRipPlayer {
   }
 
   savePreferences() {
-    if (!Config.browserHasLocalStorage) return;
     const s = this.state;
     const prefs = {
       isAutoplay: s.isAutoplay,
@@ -1740,10 +1889,13 @@ class RandomRipPlayer {
       yearFilterIndex: s.yearFilterIndex,
       sortIndex: s.sortIndex,
     };
-    window.localStorage.setItem(
-      Config.StorageKeys.USER_PREFERENCES,
-      JSON.stringify(prefs),
-    );
+    if (Config.browserHasLocalStorage) {
+      window.localStorage.setItem(
+        Config.StorageKeys.USER_PREFERENCES,
+        JSON.stringify(prefs),
+      );
+    }
+    this.syncPlaylistWindow({ preserveTime: true });
   }
 
   loadPreferences() {
@@ -1880,8 +2032,6 @@ window.onYouTubeIframeAPIReady = async () => {
     width: container.offsetWidth,
     videoId: vidId,
     playerVars: {
-      playlist: app.getInitialPlaylist(),
-      index: 0,
       autoplay: 1,
       enablejsapi: 1,
       disablekb: 0,
