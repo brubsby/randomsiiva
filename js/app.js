@@ -4,7 +4,7 @@ class RandomRipPlayer {
       nextVidId: null,
       currentVidId: null,
       history: [],
-      playlistTimeline: [],
+      playlistTimeline: [], // distinct from history because it lets you go back without losing the "future"
       playlistIndex: 0,
       currentVidTitle: null,
       isCurrentVidKFAD: false,
@@ -64,7 +64,6 @@ class RandomRipPlayer {
     this.playlistReady = false;
     this.suppressNextUnstarted = false;
     this.markOnNextForwardTransition = true;
-    this.lastEndedAt = 0;
 
     this.worker.onmessage = (e) => {
       const { id, result, error, success } = e.data;
@@ -574,10 +573,6 @@ class RandomRipPlayer {
 
   getPlaylistNextVidId() {
     this.ensurePlaylistTimeline();
-    const fallbackNextId = "h6Ja9JyXs-I";
-    const cachedRandomVid = Config.browserHasLocalStorage
-      ? window.localStorage.getItem(Config.StorageKeys.RANDOM_VID)
-      : null;
 
     if (this.state.playlistIndex < this.state.playlistTimeline.length - 1) {
       const existingNext =
@@ -587,26 +582,11 @@ class RandomRipPlayer {
     }
 
     if (!this.state.sheetsChecked) {
-      if (cachedRandomVid && cachedRandomVid !== this.state.currentVidId) {
-        this.state.nextVidId = cachedRandomVid;
-        return cachedRandomVid;
-      }
-
       this.state.nextVidId = this.state.currentVidId;
       return this.state.nextVidId;
     }
 
-    const computedNext = this.getNextVidId();
-    if (
-      computedNext === fallbackNextId &&
-      cachedRandomVid &&
-      cachedRandomVid !== this.state.currentVidId
-    ) {
-      this.state.nextVidId = cachedRandomVid;
-      return cachedRandomVid;
-    }
-
-    this.state.nextVidId = computedNext;
+    this.state.nextVidId = this.getNextVidId();
     return this.state.nextVidId;
   }
 
@@ -621,9 +601,36 @@ class RandomRipPlayer {
     return [prevId, this.state.currentVidId, nextId];
   }
 
+  disablePlaylistMode({ preserveTime = false } = {}) {
+    if (!this.playlistReady) return;
+    if (!this.player || !this.state.currentVidId) {
+      this.playlistReady = false;
+      this.suppressNextUnstarted = false;
+      return;
+    }
+
+    const wasPlaying =
+      this.player.getPlayerState() === YT.PlayerState.PLAYING ||
+      this.player.getPlayerState() === YT.PlayerState.BUFFERING;
+    const startTime = preserveTime ? this.player.getCurrentTime() : 0;
+
+    this.playlistReady = false;
+    this.suppressNextUnstarted = false;
+    this.player.loadVideoById(this.state.currentVidId, startTime);
+
+    if (!wasPlaying) {
+      this.player.pauseVideo();
+    }
+  }
+
   syncPlaylistWindow({ preserveTime = false } = {}) {
     if (!this.player || !this.state.currentVidId || !this.state.sheetsChecked)
       return;
+
+    if (!this.state.isAutoplay) {
+      this.disablePlaylistMode({ preserveTime });
+      return;
+    }
 
     const wasPlaying =
       this.player.getPlayerState() === YT.PlayerState.PLAYING ||
@@ -705,20 +712,10 @@ class RandomRipPlayer {
       }
 
       const newIndex = this.player.getPlaylistIndex();
-      const endedJustNow = Date.now() - this.lastEndedAt < 2000;
-      if (!this.state.isAutoplay && newIndex === 2 && endedJustNow) {
-        this.lastEndedAt = 0;
-        this.syncPlaylistWindow();
-        return;
-      }
-
-      this.lastEndedAt = 0;
       this.clearTimeOver();
       if (newIndex === 0 || newIndex === 2) {
         this.onSongTransition(newIndex);
       }
-    } else if (event.data == YT.PlayerState.ENDED) {
-      this.lastEndedAt = Date.now();
     } else if (event.data == YT.PlayerState.PLAYING && !this.state.isInfoReady) {
       this.onTitleReady();
     }
@@ -1194,7 +1191,6 @@ class RandomRipPlayer {
     }
 
     this.markOnNextForwardTransition = !!markWatched;
-    this.lastEndedAt = 0;
     window.localStorage.setItem(
       Config.StorageKeys.RANDOM_VID,
       this.getRandomUnwatchedSiivaVid(),
@@ -1331,6 +1327,9 @@ class RandomRipPlayer {
 
   toggleAutoplay() {
     this.state.isAutoplay = !this.state.isAutoplay;
+    if (!this.state.isAutoplay) {
+      this.disablePlaylistMode({ preserveTime: true });
+    }
     if (
       this.state.isAutoplay &&
       this.player &&
